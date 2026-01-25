@@ -11,7 +11,7 @@ client_secret.json
 backup/
 
 # Contexto de desarrollo
-.project_context.md
+project_context.md
 
 # Sistema Operativo / IDE
 .DS_Store
