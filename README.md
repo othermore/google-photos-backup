@@ -53,4 +53,4 @@ Follow the on-screen instructions. This will generate a config file at `~/.confi
 (Coming soon)
 
 ## Credits
-Developed by http://ntonio.mg with the help of gemini
+Developed by http://antonio.mg with the help of gemini

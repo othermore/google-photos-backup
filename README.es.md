@@ -53,4 +53,4 @@ Sigue las instrucciones en pantalla. Esto generará un archivo de configuración
 (Próximamente)
 
 ## Créditos
-Desarrollado por http://ntonio.mg con ayuda de gemini
+Desarrollado por http://antonio.mg con ayuda de gemini
