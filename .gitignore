@@ -1,27 +1,19 @@
-# Binarios y ejecutables
+# Binarios
 gpb
-main
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
 
-# Ficheros de configuración y credenciales (¡SEGURIDAD!)
+# Configuración y Secretos (¡IMPORTANTE!)
 config.yaml
 token.json
-*.env
 client_secret.json
 
-# Carpetas de datos locales
+# Datos locales
+*.jsonl
 backup/
-photos/
-gphotos-backup-temp/
 
-# Configuración del IDE y sistema
-.vscode/
-.idea/
+# Contexto de desarrollo
+.project_context.md
+
+# Sistema Operativo / IDE
 .DS_Store
-
-# Índice local (si no quieres subir tu lista de fotos)
-index.jsonl
+.idea/
+.vscode/

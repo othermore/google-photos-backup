@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
+	"google-photos-backup/internal/auth"
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n" // Importar paquete i18n
-	"google-photos-backup/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,8 +17,6 @@ var configureCmd = &cobra.Command{
 	Use:   "configure",
 	Short: "Configure credentials and directories",
 	Run: func(cmd *cobra.Command, args []string) {
-		reader := bufio.NewReader(os.Stdin)
-
 		fmt.Println("========================================")
 		fmt.Println(i18n.T("header_title"))
 		fmt.Println("========================================")
@@ -38,24 +35,14 @@ var configureCmd = &cobra.Command{
 		fmt.Println("")
 
 		// 1. Client ID
-		fmt.Print(i18n.T("prompt_client_id"))
-		clientID, _ := reader.ReadString('\n')
-		clientID = strings.TrimSpace(clientID)
+		clientID := prompt(i18n.T("prompt_client_id"), config.AppConfig.ClientID)
 
 		// 2. Client Secret
-		fmt.Print(i18n.T("prompt_client_secret"))
-		clientSecret, _ := reader.ReadString('\n')
-		clientSecret = strings.TrimSpace(clientSecret)
+		clientSecret := prompt(i18n.T("prompt_client_secret"), config.AppConfig.ClientSecret)
 
 		// 3. Backup Dir
 		fmt.Println("")
-		fmt.Printf(i18n.T("prompt_backup_dir"), config.AppConfig.BackupPath)
-		backupPath, _ := reader.ReadString('\n')
-		backupPath = strings.TrimSpace(backupPath)
-		if backupPath == "" {
-			backupPath = config.AppConfig.BackupPath
-		}
-		
+		backupPath := prompt(i18n.T("prompt_backup_dir"), config.AppConfig.BackupPath)
 		absPath, _ := filepath.Abs(backupPath)
 
 		// 4. Guardar
@@ -83,12 +70,10 @@ var configureCmd = &cobra.Command{
 		}
 
 		fmt.Printf(i18n.T("success_msg")+"\n", viper.ConfigFileUsed())
-		
+
 		// 6. Login Ask
-		fmt.Print(i18n.T("login_ask"))
-		confirm, _ := reader.ReadString('\n')
-		// Aceptamos 's' (spanish) o 'y' (english)
-		ans := strings.TrimSpace(strings.ToLower(confirm))
+		confirm := prompt(i18n.T("login_ask"), "")
+		ans := strings.ToLower(confirm)
 		if ans == "s" || ans == "y" {
 			loginFlow()
 		}
@@ -98,5 +83,7 @@ var configureCmd = &cobra.Command{
 func loginFlow() {
 	fmt.Println(i18n.T("login_start"))
 	fmt.Println(i18n.T("browser_open"))
-	utils.OpenBrowser("https://google.com")
+	if err := auth.Start(config.AppConfig.ClientID, config.AppConfig.ClientSecret, config.AppConfig.TokenPath); err != nil {
+		fmt.Printf("Error en autenticación: %v\n", err)
+	}
 }

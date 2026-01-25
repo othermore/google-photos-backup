@@ -58,8 +58,8 @@ var messages = map[string]map[string]string{
 		"es": "Introduce tu Google Cloud Client Secret: ",
 	},
 	"prompt_backup_dir": {
-		"en": "Backup directory (Press Enter to use '%s'): ",
-		"es": "Directorio para guardar fotos (Enter para usar '%s'): ",
+		"en": "Backup directory",
+		"es": "Directorio para guardar fotos",
 	},
 	"success_msg": {
 		"en": "\n✅ Configuration saved to: %s",

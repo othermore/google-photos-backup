@@ -10,10 +10,12 @@ import (
 )
 
 type Config struct {
-	UserID     string `mapstructure:"user_id"`
-	BackupPath string `mapstructure:"backup_path"`
-	IndexPath  string `mapstructure:"index_path"`
-    // Aquí añadiremos credenciales más adelante
+	UserID       string `mapstructure:"user_id"`
+	BackupPath   string `mapstructure:"backup_path"`
+	IndexPath    string `mapstructure:"index_path"`
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
+	TokenPath    string `mapstructure:"token_path"`
 }
 
 var AppConfig Config
@@ -36,6 +38,12 @@ func InitConfig() {
 	// 3. Valores por defecto
 	viper.SetDefault("backup_path", "./backup")
 	viper.SetDefault("index_path", "./index.jsonl")
+
+	// Definimos ruta por defecto para el token dentro del directorio de config
+	if home, err := os.UserHomeDir(); err == nil {
+		defaultTokenPath := filepath.Join(home, ".config", "google-photos-backup", "token.json")
+		viper.SetDefault("token_path", defaultTokenPath)
+	}
 
 	// 4. Intentar leer
 	if err := viper.ReadInConfig(); err != nil {
