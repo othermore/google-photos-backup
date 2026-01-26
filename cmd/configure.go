@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"google-photos-backup/internal/browser"
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n" // Importar paquete i18n
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,12 +25,6 @@ var configureCmd = &cobra.Command{
 		fmt.Println("")
 		fmt.Println(i18n.T("steps_title"))
 		fmt.Println(i18n.T("step_1"))
-		fmt.Println(i18n.T("step_2"))
-		fmt.Println(i18n.T("step_3"))
-		fmt.Println(i18n.T("step_4"))
-		fmt.Println(i18n.T("step_5"))
-		fmt.Println("")
-		fmt.Println(i18n.T("readme_hint"))
 		fmt.Println("========================================")
 		fmt.Println("")
 
@@ -60,8 +56,33 @@ var configureCmd = &cobra.Command{
 		fmt.Printf(i18n.T("success_msg")+"\n", viper.ConfigFileUsed())
 
 		// 6. Login Ask
-		fmt.Println("")
-		fmt.Println("TODO: Implementar inicio de sesión con navegador (Go-Rod)")
-		fmt.Println("En la próxima fase implementaremos la apertura del navegador para que inicies sesión.")
+		confirm := prompt(i18n.T("login_ask"), "")
+		ans := strings.ToLower(confirm)
+		if ans == "s" || ans == "y" || ans == "yes" || ans == "si" {
+			loginFlow(absPath)
+		}
 	},
+}
+
+func loginFlow(backupPath string) {
+	fmt.Println(i18n.T("login_start"))
+	fmt.Println(i18n.T("browser_open"))
+
+	// Usamos el directorio de backup para guardar la sesión del navegador (carpeta 'browser_data')
+	userDataDir := filepath.Join(backupPath, "browser_data")
+
+	// Headless = false para que el usuario pueda ver y escribir
+	bm := browser.New(userDataDir, false)
+	bm.ManualLogin()
+
+	// Verificación Headless inmediata
+	fmt.Println("\nValidando credenciales guardadas...")
+	bmHeadless := browser.New(userDataDir, true)
+	defer bmHeadless.Close()
+
+	if bmHeadless.VerifySession() {
+		fmt.Println("\n✅ Sesión guardada y verificada correctamente. Las próximas ejecuciones usarán estas cookies.")
+	} else {
+		fmt.Println("\n⚠️  No se pudo verificar la sesión. Es posible que el login no se completara o Google pida 2FA de nuevo.")
+	}
 }
