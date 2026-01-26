@@ -9,8 +9,9 @@ Diseñada para ser ejecutada manualmente o mediante Cron en servidores Linux (De
 
 ## Características
 
-* **Híbrido:** Utiliza la API oficial para listar archivos y un sistema de descarga directa para obtener la máxima calidad (saltando la compresión de la API).
-* **Incremental:** Mantiene un índice local (`index.jsonl`) para descargar solo las fotos nuevas.
+* **Takeout Automatizado:** Automatiza la solicitud y descarga de copias de seguridad completas desde Google Takeout.
+* **Calidad Original:** Garantiza la descarga de los archivos originales con todos sus metadatos.
+* **Organización Inteligente:** Procesa los archivos descargados para corregir fechas EXIF (usando los JSON de Google) y organiza las fotos en álbumes.
 * **Headless:** Configurable mediante archivos, ideal para servidores sin interfaz gráfica.
 * **Portable:** Un solo binario sin dependencias externas complejas.
 
@@ -26,19 +27,9 @@ go build -o gpb main.go
 
 ## Configuración
 
-Antes de usar la aplicación, necesitas obtener credenciales de Google.
+La aplicación utiliza un navegador automatizado (Chrome/Chromium). La primera vez necesitarás iniciar sesión manualmente para guardar la sesión.
 
-### 1. Obtener Credenciales de Google
-
-1.  Ve a la [Google Cloud Console](https://console.cloud.google.com/).
-2.  Crea un **Nuevo Proyecto**.
-3.  Habilita la **"Google Photos Library API"**.
-4.  Configura la **Pantalla de consentimiento OAuth** (User Type: External). Añade tu email a "Usuarios de prueba".
-5.  Crea **Credenciales** -> **ID de cliente de OAuth** (Tipo: Aplicación de escritorio).
-6.  **Importante:** Añade `http://localhost:8085/callback` en "URI de redireccionamiento autorizados".
-7.  Copia tu **ID de cliente** y tu **Secreto de cliente**.
-
-### 2. Ejecutar el configurador
+### Ejecutar el configurador
 
 Ejecuta el siguiente comando en tu terminal:
 

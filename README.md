@@ -9,8 +9,9 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 
 ## Features
 
-* **Hybrid Approach:** Uses the official API for metadata and listing, and a headless browser scraper for full-quality downloads (bypassing API compression).
-* **Incremental:** Maintains a local index (`index.jsonl`) to download only new items.
+* **Automated Takeout:** Automates the request and download of full backups via Google Takeout.
+* **Original Quality:** Ensures download of original files with full metadata.
+* **Smart Organization:** Processes downloaded files to fix EXIF dates (using Google's JSONs) and organizes photos into albums.
 * **Headless:** Configurable via files, perfect for servers without a GUI.
 * **Portable:** Single static binary with no complex dependencies.
 
@@ -26,19 +27,9 @@ go build -o gpb main.go
 
 ## Configuration
 
-To use this app, you must create your own Google Cloud credentials.
+The app uses an automated browser (Chrome/Chromium). You will need to log in manually the first time to save the session.
 
-### 1. Get Google Credentials
-
-1.  Go to [Google Cloud Console](https://console.cloud.google.com/).
-2.  Create a **New Project**.
-3.  Enable **"Google Photos Library API"**.
-4.  Configure **OAuth Consent Screen** (User Type: External). Add your email to "Test Users".
-5.  Create **Credentials** -> **OAuth Client ID** (Type: Desktop App).
-6.  **Important:** Add `http://localhost:8085/callback` to "Authorized redirect URIs".
-7.  Copy your **Client ID** and **Client Secret**.
-
-### 2. Setup
+### Setup
 
 Run the configuration wizard:
 

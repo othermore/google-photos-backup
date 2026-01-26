@@ -14,48 +14,20 @@ var messages = map[string]map[string]string{
 		"es": "   CONFIGURACIÓN DE GOOGLE PHOTOS BACKUP",
 	},
 	"intro_1": {
-		"en": "To use this app, you need to create your own Google Cloud credentials",
-		"es": "Para usar esta aplicación, necesitas crear tus propias credenciales",
+		"en": "This app automates Google Takeout backups.",
+		"es": "Esta aplicación automatiza las copias de seguridad de Google Takeout.",
 	},
 	"intro_2": {
-		"en": "(it's free for personal use).",
-		"es": "de Google Cloud (es gratuito para uso personal).",
+		"en": "You will need to log in via browser.",
+		"es": "Necesitarás iniciar sesión a través del navegador.",
 	},
 	"steps_title": {
 		"en": "QUICK STEPS:",
 		"es": "PASOS RÁPIDOS:",
 	},
 	"step_1": {
-		"en": "1. Go to https://console.cloud.google.com/",
-		"es": "1. Ve a https://console.cloud.google.com/",
-	},
-	"step_2": {
-		"en": "2. Create a new project.",
-		"es": "2. Crea un proyecto nuevo.",
-	},
-	"step_3": {
-		"en": "3. Enable 'Google Photos Library API'.",
-		"es": "3. Habilita la 'Google Photos Library API'.",
-	},
-	"step_4": {
-		"en": "4. Configure OAuth Consent Screen (User Type: External).",
-		"es": "4. Configura la Pantalla de consentimiento OAuth (User Type: External).",
-	},
-	"step_5": {
-		"en": "5. Create OAuth 2.0 Credentials (Type: Desktop App).",
-		"es": "5. Crea credenciales OAuth 2.0 (Tipo: Desktop App).",
-	},
-	"readme_hint": {
-		"en": "Check README.md for a detailed step-by-step guide.",
-		"es": "Consulta el README.md para una guía detallada paso a paso.",
-	},
-	"prompt_client_id": {
-		"en": "Enter your Google Cloud Client ID: ",
-		"es": "Introduce tu Google Cloud Client ID: ",
-	},
-	"prompt_client_secret": {
-		"en": "Enter your Google Cloud Client Secret: ",
-		"es": "Introduce tu Google Cloud Client Secret: ",
+		"en": "1. Run configure to set backup directory.",
+		"es": "1. Ejecuta configure para establecer el directorio de backup.",
 	},
 	"prompt_backup_dir": {
 		"en": "Backup directory",
