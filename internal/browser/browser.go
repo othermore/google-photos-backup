@@ -112,3 +112,69 @@ func (m *Manager) VerifySession() bool {
 	// Si nos redirige a accounts.google.com o about.google, falló.
 	return strings.Contains(url, "photos.google.com")
 }
+
+// RequestTakeout automatiza la solicitud de un backup de Google Photos en Takeout
+func (m *Manager) RequestTakeout() error {
+	fmt.Println("🚀 Navegando a Google Takeout...")
+	// Forzamos el idioma inglés (hl=en) para que los selectores por aria-label funcionen siempre
+	page := m.Browser.MustPage("https://takeout.google.com/settings/takeout?hl=en")
+	page.MustWaitLoad()
+
+	// Esperar a que el botón "Deselect all" esté visible y hacer clic
+	fmt.Println("   - Deseleccionando todos los productos...")
+	// Usamos selectores robustos basados en atributos que Google usa internamente
+	page.MustElement(`[aria-label="Deselect all"]`).MustClick()
+	time.Sleep(1 * time.Second) // Pequeña pausa para que la UI reaccione
+
+	// Seleccionar solo Google Photos
+	fmt.Println("   - Seleccionando Google Photos...")
+
+	// Estrategia robusta: Buscar el texto "Google Photos" y subir por el DOM hasta encontrar el checkbox asociado
+	// Esto evita depender de atributos data-id que pueden cambiar.
+	productLabel := page.MustElementR("div", "Google Photos")
+
+	// Subimos niveles hasta encontrar el contenedor del producto que tiene el checkbox
+	found := false
+	parent := productLabel
+	for i := 0; i < 10; i++ { // Intentamos hasta 10 niveles hacia arriba
+		var err error
+		parent, err = parent.Parent()
+		if err != nil {
+			break
+		}
+		if has, _, _ := parent.Has(`input[type="checkbox"]`); has {
+			parent.MustElement(`input[type="checkbox"]`).MustClick()
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("no se pudo encontrar el checkbox de Google Photos")
+	}
+
+	// Ir al siguiente paso
+	fmt.Println("   - Avanzando al siguiente paso...")
+	page.MustElement(`button[aria-label="Next step"]`).MustClick()
+
+	// Esperar a que la sección de creación de exportación cargue
+	page.MustWaitLoad()
+
+	// Seleccionar 50GB para reducir número de archivos (menos ZIPs que descargar)
+	fmt.Println("   - Configurando tamaño a 50GB...")
+	// Abrir menú de tamaño
+	page.MustElement(`div[aria-label="File size select"]`).MustClick()
+	time.Sleep(500 * time.Millisecond)
+	// Seleccionar opción de 50 GB
+	page.MustElementR("li", "50 GB").MustClick()
+	time.Sleep(500 * time.Millisecond)
+
+	// Crear la exportación
+	fmt.Println("   - Creando la exportación...")
+	page.MustElementR("button", "Create export").MustClick()
+
+	// Esperar a la página de confirmación
+	fmt.Println("   - Esperando confirmación...")
+	page.MustWaitNavigation()
+
+	return nil
+}
