@@ -178,3 +178,101 @@ func (m *Manager) RequestTakeout() error {
 
 	return nil
 }
+
+// ExportStatus representa el estado de una exportación en Takeout
+type ExportStatus struct {
+	InProgress    bool
+	Completed     bool
+	DownloadLinks []string
+	CreateTime    time.Time
+	CreatedAt     time.Time
+	ID            string
+}
+
+// CheckExportStatus comprueba si hay exportaciones activas o listas para descargar
+func (m *Manager) CheckExportStatus() (*ExportStatus, error) {
+	fmt.Println("🔍 Comprobando estado de exportaciones en Takeout...")
+	page := m.Browser.MustPage("https://takeout.google.com/manage?hl=en")
+	page.MustWaitLoad()
+
+	status := &ExportStatus{}
+
+	// 1. Comprobar si hay exportación en curso
+	// Buscamos el texto "Export in progress..." o "Your files are currently being prepared"
+	// Basado en el HTML proporcionado: <div class="PEJjGd">Export in progress...</div>
+	// y <div class="yrYG6">Your files are currently being prepared</div>
+
+	// Usamos HasR para buscar texto visible, es más robusto que clases ofuscadas
+	// Nota: Buscamos "Export in progress" o "files are currently being prepared"
+	inProgress, _, _ := page.HasR("div", "Export in progress...")
+	if inProgress {
+		status.InProgress = true
+		fmt.Println("   - Detectada exportación en curso.")
+
+		// Extraer ID de la exportación (data-archive-id)
+		if el, err := page.Element(`div[data-in-progress="true"]`); err == nil {
+			if attr, err := el.Attribute("data-archive-id"); err == nil && attr != nil {
+				status.ID = *attr
+			}
+		}
+
+		// Intentar extraer la fecha de creación
+		// HTML: Created: January 26, 2026, 5:28 PM
+		// Buscamos el div que contiene "Created:"
+		if createdEl, err := page.ElementR("div", "Created:"); err == nil {
+			text, _ := createdEl.Text() // Ej: "Created: January 26, 2026, 5:28 PM"
+			// fmt.Printf("   - Info: %s\n", text) // Comentado para no ensuciar el log
+
+			// Intentar parsear la fecha (formato inglés por ?hl=en)
+			if idx := strings.Index(text, "Created:"); idx != -1 {
+				dateStr := text[idx+len("Created:"):]
+				// Cortar en el primer salto de línea si existe (por si hay texto después)
+				if i := strings.IndexAny(dateStr, "\r\n"); i != -1 {
+					dateStr = dateStr[:i]
+				}
+				// Normalizar espacios (Google usa U+202F NARROW NO-BREAK SPACE antes de PM/AM)
+				dateStr = strings.ReplaceAll(dateStr, "\u202f", " ")
+				dateStr = strings.TrimSpace(dateStr)
+				// Layout para "January 26, 2026, 5:28 PM"
+				layout := "January 2, 2006, 3:04 PM"
+				if t, err := time.Parse(layout, dateStr); err == nil {
+					status.CreatedAt = t
+				}
+			}
+		}
+	}
+
+	// 2. Comprobar si hay exportaciones completadas (TODO: Implementar en siguiente paso con HTML de descarga)
+	// El HTML actual muestra "No completed exports available", así que por ahora asumimos false.
+	// Si NO existe el texto "No completed exports available", asumimos que hay algo (o la lista está vacía por otra razón)
+	noCompleted, _, _ := page.HasR("p", "No completed exports available")
+	if !noCompleted {
+		// Si no dice que "no hay", y tampoco está "in progress" (o sí), podría haber descargas.
+		// Buscamos botones de "Download"
+		if hasDownload, _, _ := page.HasR("span", "Download"); hasDownload {
+			status.Completed = true
+			fmt.Println("   - Detectada exportación COMPLETADA y lista para descargar.")
+		}
+	}
+
+	return status, nil
+}
+
+// CancelExport cancela una exportación en curso
+func (m *Manager) CancelExport() error {
+	fmt.Println("🛑 Cancelando exportación anterior (stale)...")
+	page := m.Browser.MustPage("https://takeout.google.com/manage?hl=en")
+	page.MustWaitLoad()
+
+	// Buscar botón "Cancel export"
+	// HTML: <button ... aria-label="Cancel export..."><span ...>Cancel export</span></button>
+	btn, err := page.ElementR("button", "Cancel export")
+	if err != nil {
+		return fmt.Errorf("no se encontró el botón de cancelar exportación")
+	}
+
+	btn.MustClick()
+	time.Sleep(2 * time.Second) // Esperar a que la UI se actualice
+	fmt.Println("   - Solicitud de cancelación enviada.")
+	return nil
+}

@@ -5,17 +5,19 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	UserID       string `mapstructure:"user_id"`
-	BackupPath   string `mapstructure:"backup_path"`
-	IndexPath    string `mapstructure:"index_path"`
-	ClientID     string `mapstructure:"client_id"`
-	ClientSecret string `mapstructure:"client_secret"`
-	TokenPath    string `mapstructure:"token_path"`
+	UserID          string        `mapstructure:"user_id"`
+	BackupPath      string        `mapstructure:"backup_path"`
+	IndexPath       string        `mapstructure:"index_path"`
+	ClientID        string        `mapstructure:"client_id"`
+	ClientSecret    string        `mapstructure:"client_secret"`
+	TokenPath       string        `mapstructure:"token_path"`
+	BackupFrequency time.Duration `mapstructure:"backup_frequency"`
 }
 
 var AppConfig Config
@@ -38,6 +40,7 @@ func InitConfig() {
 	// 3. Valores por defecto
 	viper.SetDefault("backup_path", "./backup")
 	viper.SetDefault("index_path", "./index.jsonl")
+	viper.SetDefault("backup_frequency", "168h") // 7 días (24*7)
 
 	// Definimos ruta por defecto para el token dentro del directorio de config
 	if home, err := os.UserHomeDir(); err == nil {
