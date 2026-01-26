@@ -129,9 +129,9 @@ func (m *Manager) RequestTakeout() error {
 	// Seleccionar solo Google Photos
 	fmt.Println("   - Seleccionando Google Photos...")
 
-	// Estrategia robusta: Buscar el texto "Google Photos" y subir por el DOM hasta encontrar el checkbox asociado
-	// Esto evita depender de atributos data-id que pueden cambiar.
-	productLabel := page.MustElementR("div", "Google Photos")
+	// Estrategia robusta: Usamos XPath para buscar el texto EXACTO "Google Photos".
+	// normalize-space() elimina espacios extra y evita coincidencias parciales en descripciones de otros productos.
+	productLabel := page.MustElementX(`//div[normalize-space(text())="Google Photos"]`)
 
 	// Subimos niveles hasta encontrar el contenedor del producto que tiene el checkbox
 	found := false
@@ -187,15 +187,16 @@ type ExportStatus struct {
 	CreateTime    time.Time
 	CreatedAt     time.Time
 	ID            string
+	StatusText    string // Texto crudo del estado (ej: "Completo", "Cancelado")
 }
 
 // CheckExportStatus comprueba si hay exportaciones activas o listas para descargar
-func (m *Manager) CheckExportStatus() (*ExportStatus, error) {
+func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	fmt.Println("🔍 Comprobando estado de exportaciones en Takeout...")
 	page := m.Browser.MustPage("https://takeout.google.com/manage?hl=en")
 	page.MustWaitLoad()
 
-	status := &ExportStatus{}
+	var statuses []ExportStatus
 
 	// 1. Comprobar si hay exportación en curso
 	// Buscamos el texto "Export in progress..." o "Your files are currently being prepared"
@@ -204,58 +205,86 @@ func (m *Manager) CheckExportStatus() (*ExportStatus, error) {
 
 	// Usamos HasR para buscar texto visible, es más robusto que clases ofuscadas
 	// Nota: Buscamos "Export in progress" o "files are currently being prepared"
-	inProgress, _, _ := page.HasR("div", "Export in progress...")
-	if inProgress {
-		status.InProgress = true
-		fmt.Println("   - Detectada exportación en curso.")
+	// BUG FIX: Si hay varias, el texto es "Exports in progress..." (plural).
+	// En lugar de depender del texto del título, buscamos directamente los elementos de progreso.
+	if elements, err := page.Elements(`div[data-in-progress="true"]`); err == nil && len(elements) > 0 {
+		for _, el := range elements {
+			// Verificar si es de Google Photos
+			text, _ := el.Text()
+			if strings.Contains(text, "Google Photos") {
+				current := ExportStatus{InProgress: true}
+				fmt.Println("   - Detectada exportación en curso de Google Photos.")
 
-		// Extraer ID de la exportación (data-archive-id)
-		if el, err := page.Element(`div[data-in-progress="true"]`); err == nil {
-			if attr, err := el.Attribute("data-archive-id"); err == nil && attr != nil {
-				status.ID = *attr
-			}
-		}
-
-		// Intentar extraer la fecha de creación
-		// HTML: Created: January 26, 2026, 5:28 PM
-		// Buscamos el div que contiene "Created:"
-		if createdEl, err := page.ElementR("div", "Created:"); err == nil {
-			text, _ := createdEl.Text() // Ej: "Created: January 26, 2026, 5:28 PM"
-			// fmt.Printf("   - Info: %s\n", text) // Comentado para no ensuciar el log
-
-			// Intentar parsear la fecha (formato inglés por ?hl=en)
-			if idx := strings.Index(text, "Created:"); idx != -1 {
-				dateStr := text[idx+len("Created:"):]
-				// Cortar en el primer salto de línea si existe (por si hay texto después)
-				if i := strings.IndexAny(dateStr, "\r\n"); i != -1 {
-					dateStr = dateStr[:i]
+				if attr, err := el.Attribute("data-archive-id"); err == nil && attr != nil {
+					current.ID = *attr
 				}
-				// Normalizar espacios (Google usa U+202F NARROW NO-BREAK SPACE antes de PM/AM)
-				dateStr = strings.ReplaceAll(dateStr, "\u202f", " ")
-				dateStr = strings.TrimSpace(dateStr)
-				// Layout para "January 26, 2026, 5:28 PM"
-				layout := "January 2, 2006, 3:04 PM"
-				if t, err := time.Parse(layout, dateStr); err == nil {
-					status.CreatedAt = t
+
+				// Intentar extraer la fecha de creación dentro del elemento de progreso
+				if createdEl, err := el.ElementR("div", "Created:"); err == nil {
+					text, _ := createdEl.Text()
+					if idx := strings.Index(text, "Created:"); idx != -1 {
+						dateStr := text[idx+len("Created:"):]
+						if i := strings.IndexAny(dateStr, "\r\n"); i != -1 {
+							dateStr = dateStr[:i]
+						}
+						dateStr = strings.ReplaceAll(dateStr, "\u202f", " ")
+						dateStr = strings.TrimSpace(dateStr)
+						layout := "January 2, 2006, 3:04 PM"
+						if t, err := time.Parse(layout, dateStr); err == nil {
+							current.CreatedAt = t
+						}
+					}
 				}
+				statuses = append(statuses, current)
+			} else {
+				fmt.Println("   - Ignorando exportación en curso de otro producto.")
 			}
 		}
 	}
 
-	// 2. Comprobar si hay exportaciones completadas (TODO: Implementar en siguiente paso con HTML de descarga)
-	// El HTML actual muestra "No completed exports available", así que por ahora asumimos false.
-	// Si NO existe el texto "No completed exports available", asumimos que hay algo (o la lista está vacía por otra razón)
-	noCompleted, _, _ := page.HasR("p", "No completed exports available")
-	if !noCompleted {
-		// Si no dice que "no hay", y tampoco está "in progress" (o sí), podría haber descargas.
-		// Buscamos botones de "Download"
-		if hasDownload, _, _ := page.HasR("span", "Download"); hasDownload {
-			status.Completed = true
-			fmt.Println("   - Detectada exportación COMPLETADA y lista para descargar.")
+	// 2. Iterar sobre la lista de exportaciones pasadas (Completadas, Canceladas, etc.)
+	// Buscamos la lista ul[jsname="archivelist"] y sus elementos li
+	if list, err := page.Element(`ul[jsname="archivelist"]`); err == nil {
+		items, _ := list.Elements("li")
+		for _, item := range items {
+			// Verificar si es de Google Photos
+			text, _ := item.Text()
+			if !strings.Contains(text, "Google Photos") {
+				continue
+			}
+
+			var st ExportStatus
+
+			// Extraer ID del enlace
+			// <a href="./manage/archive/ID_AQUI" ...>
+			if link, err := item.Element("a"); err == nil {
+				href, _ := link.Attribute("href")
+				if href != nil {
+					parts := strings.Split(*href, "/")
+					if len(parts) > 0 {
+						st.ID = parts[len(parts)-1]
+					}
+				}
+			}
+
+			// Extraer Estado (Texto visible)
+			// <p class="BXHFQ">Completo</p> o <p class="BXHFQ">Cancelado</p>
+			// Nota: Al forzar ?hl=en, esperamos "Complete", "Cancelled", etc.
+			if statusEl, err := item.Element(`p.BXHFQ`); err == nil {
+				text, _ := statusEl.Text()
+				st.StatusText = text
+				if strings.Contains(text, "Complete") {
+					st.Completed = true
+				}
+			}
+
+			// TODO: Extraer fecha de creación si es necesario (está en un div dentro del li)
+
+			statuses = append(statuses, st)
 		}
 	}
 
-	return status, nil
+	return statuses, nil
 }
 
 // CancelExport cancela una exportación en curso

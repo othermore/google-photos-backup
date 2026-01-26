@@ -7,6 +7,7 @@ import (
 	"google-photos-backup/internal/registry"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -49,41 +50,90 @@ var syncCmd = &cobra.Command{
 		defer bm.Close()
 
 		// 1. Comprobar estado actual
-		status, err := bm.CheckExportStatus()
+		statuses, err := bm.CheckExportStatus()
 		if err != nil {
 			fmt.Printf("❌ Error comprobando estado: %v\n", err)
 			return
 		}
 
-		if status.InProgress {
-			fmt.Println("⏳ Ya hay una exportación en curso.")
+		// Actualizar registro local con lo encontrado
+		var inProgressStatus *browser.ExportStatus
+		var completedStatus *browser.ExportStatus
 
-			// Sincronizar con el registro si es una exportación huérfana
-			if status.ID != "" {
-				entry := reg.Get(status.ID)
-				if entry == nil {
-					fmt.Println("   - Detectada exportación no registrada. Añadiendo al historial...")
-					reg.Add(registry.ExportEntry{
-						ID:          status.ID,
-						RequestedAt: status.CreatedAt, // Usamos la fecha detectada
-						Status:      registry.StatusInProgress,
-					})
-					if err := reg.Save(); err != nil {
-						fmt.Printf("❌ Error guardando historial: %v\n", err)
+		for _, st := range statuses {
+			if st.ID == "" {
+				continue
+			}
+
+			// Buscar si existe en el registro
+			entry := reg.Get(st.ID)
+			if entry == nil {
+				// Si no existe, intentamos fusionar con una solicitud huérfana local
+				if reg.MergeOrphan(st.ID, st.CreatedAt) {
+					fmt.Printf("   - Asociando exportación %s a solicitud local pendiente.\n", st.ID)
+					entry = reg.Get(st.ID)
+				} else {
+					// Si no hay huérfanas, creamos una nueva (importación pura)
+					fmt.Printf("   - Importando exportación externa: %s (%s)\n", st.ID, st.StatusText)
+					newEntry := registry.ExportEntry{
+						ID:          st.ID,
+						RequestedAt: st.CreatedAt,              // Puede ser zero si no se parseó
+						Status:      registry.StatusInProgress, // Default, se actualizará abajo
 					}
-				} else if entry.RequestedAt.IsZero() && !status.CreatedAt.IsZero() {
-					fmt.Println("   - Corrigiendo fecha de solicitud en el historial...")
-					entry.RequestedAt = status.CreatedAt
-					reg.Update(*entry)
-					if err := reg.Save(); err != nil {
-						fmt.Printf("❌ Error guardando historial: %v\n", err)
-					}
+					reg.Add(newEntry)
+					entry = reg.Get(st.ID)
 				}
 			}
 
+			// Actualizar estado
+			updated := false
+			if st.InProgress {
+				inProgressStatus = &st
+				if entry.Status != registry.StatusInProgress {
+					entry.Status = registry.StatusInProgress
+					updated = true
+				}
+				// Actualizar fecha si la tenemos y antes no
+				if !st.CreatedAt.IsZero() && entry.RequestedAt.IsZero() {
+					entry.RequestedAt = st.CreatedAt
+					updated = true
+				}
+			} else if st.Completed {
+				completedStatus = &st // Guardamos la última completada encontrada
+				if entry.Status != registry.StatusReady && entry.Status != registry.StatusProcessed {
+					entry.Status = registry.StatusReady // Lista para descargar
+					entry.CompletedAt = time.Now()
+					updated = true
+				} else if (entry.Status == registry.StatusReady || entry.Status == registry.StatusProcessed) && entry.CompletedAt.IsZero() {
+					// Si ya estaba marcada como lista pero no tenía fecha, le ponemos la actual (mejor que nada)
+					entry.CompletedAt = time.Now()
+					updated = true
+				}
+			} else if strings.Contains(strings.ToLower(st.StatusText), "cancel") {
+				// Detecta "Canceled", "Cancelled", "Cancelado", etc.
+				if entry.Status != registry.StatusCancelled {
+					entry.Status = registry.StatusCancelled
+					entry.CompletedAt = time.Now()
+					updated = true
+				} else if entry.Status == registry.StatusCancelled && entry.CompletedAt.IsZero() {
+					entry.CompletedAt = time.Now()
+					updated = true
+				}
+			}
+
+			if updated {
+				reg.Update(*entry)
+			}
+		}
+		reg.Save()
+
+		// Lógica de decisión
+		if inProgressStatus != nil {
+			fmt.Println("⏳ Ya hay una exportación en curso.")
+
 			// Comprobar antigüedad
 			// 1. Usar fecha detectada en la web (más fiable)
-			createdAt := status.CreatedAt
+			createdAt := inProgressStatus.CreatedAt
 
 			// Si tenemos fecha, comprobamos si es antigua (> 48h)
 			if !createdAt.IsZero() && time.Since(createdAt) > 48*time.Hour {
@@ -99,7 +149,7 @@ var syncCmd = &cobra.Command{
 			}
 		}
 
-		if status.Completed {
+		if completedStatus != nil {
 			fmt.Println("🎉 ¡Exportación lista para descargar!")
 			fmt.Println("TODO: Implementar lógica de descarga en la siguiente fase.")
 			return

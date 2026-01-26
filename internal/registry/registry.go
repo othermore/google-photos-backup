@@ -127,6 +127,25 @@ func (r *Registry) Get(id string) *ExportEntry {
 	return nil
 }
 
+// MergeOrphan intenta asignar un ID a una solicitud pendiente (sin ID) existente.
+// Devuelve true si encontró una huérfana y la actualizó.
+func (r *Registry) MergeOrphan(id string, createdAt time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Buscamos la solicitud pendiente más reciente (iterando desde el final)
+	for i := len(r.Exports) - 1; i >= 0; i-- {
+		if r.Exports[i].ID == "" && r.Exports[i].Status == StatusRequested {
+			r.Exports[i].ID = id
+			if !createdAt.IsZero() {
+				r.Exports[i].RequestedAt = createdAt
+			}
+			return true
+		}
+	}
+	return false
+}
+
 // Update actualiza una entrada existente
 func (r *Registry) Update(entry ExportEntry) {
 	r.mu.Lock()
