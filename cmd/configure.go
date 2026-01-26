@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"google-photos-backup/internal/auth"
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n" // Importar paquete i18n
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,22 +32,12 @@ var configureCmd = &cobra.Command{
 		fmt.Println("========================================")
 		fmt.Println("")
 
-		// 1. Client ID
-		clientID := prompt(i18n.T("prompt_client_id"), config.AppConfig.ClientID)
-
-		// 2. Client Secret
-		clientSecret := prompt(i18n.T("prompt_client_secret"), config.AppConfig.ClientSecret)
-
-		// 3. Backup Dir
-		fmt.Println("")
+		// 1. Backup Dir
 		backupPath := prompt(i18n.T("prompt_backup_dir"), config.AppConfig.BackupPath)
 		absPath, _ := filepath.Abs(backupPath)
 
-		// 4. Guardar
-		viper.Set("client_id", clientID)
-		viper.Set("client_secret", clientSecret)
+		// 2. Guardar
 		viper.Set("backup_path", absPath)
-		viper.Set("index_path", filepath.Join(absPath, "index.jsonl"))
 
 		if viper.ConfigFileUsed() == "" {
 			home, _ := os.UserHomeDir()
@@ -72,18 +60,8 @@ var configureCmd = &cobra.Command{
 		fmt.Printf(i18n.T("success_msg")+"\n", viper.ConfigFileUsed())
 
 		// 6. Login Ask
-		confirm := prompt(i18n.T("login_ask"), "")
-		ans := strings.ToLower(confirm)
-		if ans == "s" || ans == "y" {
-			loginFlow()
-		}
+		fmt.Println("")
+		fmt.Println("TODO: Implementar inicio de sesión con navegador (Go-Rod)")
+		fmt.Println("En la próxima fase implementaremos la apertura del navegador para que inicies sesión.")
 	},
-}
-
-func loginFlow() {
-	fmt.Println(i18n.T("login_start"))
-	fmt.Println(i18n.T("browser_open"))
-	if err := auth.Start(config.AppConfig.ClientID, config.AppConfig.ClientSecret, config.AppConfig.TokenPath); err != nil {
-		fmt.Printf("Error en autenticación: %v\n", err)
-	}
 }
