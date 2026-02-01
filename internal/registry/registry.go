@@ -16,6 +16,7 @@ const (
 	StatusReady       ExportStatus = "ready"       // Ready to download
 	StatusDownloading ExportStatus = "downloading" // Downloading
 	StatusProcessed   ExportStatus = "processed"   // Extracted and organized (Success)
+	StatusExpired     ExportStatus = "expired"
 	StatusFailed      ExportStatus = "failed"
 	StatusCancelled   ExportStatus = "cancelled"
 )
@@ -29,6 +30,19 @@ type ExportEntry struct {
 	TotalSize      string       `json:"total_size,omitempty"`       // String like "50 GB"
 	NewPhotosCount int          `json:"new_photos_count,omitempty"` // Added to backup
 	Error          string       `json:"error,omitempty"`
+	// Deprecated: Files are now stored in a separate state.json file per export.
+	// This field is kept for migration purposes only.
+	Files []DownloadFile `json:"files,omitempty"` // List of files to download
+}
+
+type DownloadFile struct {
+	PartNumber      int    `json:"part_number"` // 1-based index
+	Filename        string `json:"filename"`    // e.g. "takeout-20240201-001.zip"
+	Size            string `json:"size"`        // e.g. "50 GB"
+	SizeBytes       int64  `json:"size_bytes,omitempty"`
+	DownloadedBytes int64  `json:"downloaded_bytes,omitempty"`
+	Status          string `json:"status"` // "pending", "downloading", "completed", "failed"
+	URL             string `json:"url,omitempty"`
 }
 
 type Registry struct {

@@ -18,6 +18,7 @@ type Config struct {
 	ClientSecret    string        `mapstructure:"client_secret"`
 	TokenPath       string        `mapstructure:"token_path"`
 	BackupFrequency time.Duration `mapstructure:"backup_frequency"`
+	Password        string        `mapstructure:"password"` // For auto-reauthentication
 }
 
 var AppConfig Config
