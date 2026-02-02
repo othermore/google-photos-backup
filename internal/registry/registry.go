@@ -25,6 +25,7 @@ type ExportEntry struct {
 	ID             string       `json:"id"` // Archive ID from Google
 	RequestedAt    time.Time    `json:"requested_at"`
 	Status         ExportStatus `json:"status"`
+	DownloadMode   string       `json:"download_mode,omitempty"` // "directDownload" or "driveDownload"
 	CompletedAt    time.Time    `json:"completed_at,omitempty"`
 	FileCount      int          `json:"file_count,omitempty"`       // Number of zip files
 	TotalSize      string       `json:"total_size,omitempty"`       // String like "50 GB"

@@ -5,6 +5,7 @@ import (
 	"google-photos-backup/internal/browser"
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n" // Importar paquete i18n
+	"google-photos-backup/internal/logger"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,8 +33,23 @@ var configureCmd = &cobra.Command{
 		backupPath := prompt(i18n.T("prompt_backup_dir"), config.AppConfig.BackupPath)
 		absPath, _ := filepath.Abs(backupPath)
 
-		// 2. Guardar
+		// 2. Download Mode
+		currentMode := config.AppConfig.DownloadMode
+		if currentMode == "" {
+			currentMode = config.ModeDirectDownload
+		}
+		modePrompt := fmt.Sprintf("Select download mode (%s/%s) [default: %s]",
+			config.ModeDirectDownload, config.ModeDriveDownload, currentMode)
+
+		dlMode := prompt(modePrompt, currentMode)
+		if dlMode != config.ModeDirectDownload && dlMode != config.ModeDriveDownload {
+			logger.Info(i18n.T("invalid_mode"), config.ModeDirectDownload)
+			dlMode = config.ModeDirectDownload
+		}
+
+		// 3. Guardar
 		viper.Set("backup_path", absPath)
+		viper.Set("download_mode", dlMode)
 
 		if viper.ConfigFileUsed() == "" {
 			home, _ := os.UserHomeDir()
@@ -76,13 +92,13 @@ func loginFlow(backupPath string) {
 	bm.ManualLogin()
 
 	// Verificación Headless inmediata
-	fmt.Println("\nValidando credenciales guardadas...")
+	logger.Info(i18n.T("validating_creds"))
 	bmHeadless := browser.New(userDataDir, true)
 	defer bmHeadless.Close()
 
 	if bmHeadless.VerifySession() {
-		fmt.Println("\n✅ Sesión guardada y verificada correctamente. Las próximas ejecuciones usarán estas cookies.")
+		logger.Info(i18n.T("session_valid"))
 	} else {
-		fmt.Println("\n⚠️  No se pudo verificar la sesión. Es posible que el login no se completara o Google pida 2FA de nuevo.")
+		logger.Error(i18n.T("session_invalid"))
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
@@ -20,8 +21,10 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(configureCmd) // <--- AÑADIR ESTA LÍNEA
-	rootCmd.AddCommand(syncCmd)      // <--- Registrar comando sync
+	rootCmd.AddCommand(configureCmd)
+	rootCmd.AddCommand(syncCmd)
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 }
 
 func Execute() {

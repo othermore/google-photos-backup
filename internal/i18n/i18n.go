@@ -149,6 +149,198 @@ var messages = map[string]map[string]string{
 		"en": "⏳ Export in progress. Google is preparing your files. Try again later.",
 		"es": "⏳ Ya hay una exportación en curso. Google está preparando tus archivos. Vuelve a intentarlo más tarde.",
 	},
+	"config_missing": {
+		"en": "Warning: config.yaml not found. Using defaults.",
+		"es": "Aviso: No se encontró fichero config.yaml. Se usarán valores por defecto.",
+	},
+	"config_read_error": {
+		"en": "Error reading config: %s",
+		"es": "Error leyendo config: %s",
+	},
+	"config_decode_error": {
+		"en": "Error decoding config: %s",
+		"es": "Error decodificando config: %s",
+	},
+	"invalid_mode": {
+		"en": "⚠️ Invalid mode, defaulting to %s",
+		"es": "⚠️ Modo inválido, usando por defecto %s",
+	},
+	"validating_creds": {
+		"en": "\nValidating saved credentials...",
+		"es": "\nValidando credenciales guardadas...",
+	},
+	"session_valid": {
+		"en": "\n✅ Session verified successfully. Future runs will use these cookies.",
+		"es": "\n✅ Sesión guardada y verificada correctamente. Las próximas ejecuciones usarán estas cookies.",
+	},
+	"session_invalid": {
+		"en": "\n⚠️  Could not verify session. Login might not have completed or 2FA is required.",
+		"es": "\n⚠️  No se pudo verificar la sesión. Es posible que el login no se completara o Google pida 2FA de nuevo.",
+	},
+	"backup_dir_error": {
+		"en": "❌ Error: Backup directory not configured. Please run './gpb configure' first.",
+		"es": "❌ Error: El directorio de backup no está configurado. Por favor, ejecuta './gpb configure' primero.",
+	},
+	"backup_mkdir_error": {
+		"en": "❌ Error creating backup directory: %v",
+		"es": "❌ Error creando directorio de backup: %v",
+	},
+	"history_load_error": {
+		"en": "⚠️  Could not load history: %v",
+		"es": "⚠️  No se pudo cargar el historial: %v",
+	},
+	"status_check_error": {
+		"en": "❌ Error checking status: %v",
+		"es": "❌ Error comprobando estado: %v",
+	},
+	"merging_orphan": {
+		"en": "   - Associating export %s with pending local request.",
+		"es": "   - Asociando exportación %s a solicitud local pendiente.",
+	},
+	"importing_export": {
+		"en": "   - Importing external export: %s (%s)",
+		"es": "   - Importando exportación externa: %s (%s)",
+	},
+	"ignoring_expired": {
+		"en": "⚠️  Ignoring expired export (previous Quota Exceeded): %s",
+		"es": "⚠️  Ignorando exportación expirada (Quota Exceeded previo): %s",
+	},
+	"export_too_old": {
+		"en": "⚠️  Export is too old (%v). It will be cancelled.",
+		"es": "⚠️  La exportación lleva demasiado tiempo (%v). Se cancelará.",
+	},
+	"cancel_error": {
+		"en": "❌ Error cancelling: %v",
+		"es": "❌ Error cancelando: %v",
+	},
+	"ready_to_download": {
+		"en": "🎉 Export ready for download!",
+		"es": "🎉 ¡Exportación lista para descargar!",
+	},
+	"download_dir_error": {
+		"en": "❌ Error creating download directory: %v",
+		"es": "❌ Error creando directorio de descarga: %v",
+	},
+	"starting_manager": {
+		"en": "🚀 Starting robust download manager...",
+		"es": "🚀 Iniciando gestor de descargas robusto...",
+	},
+	"recovering_list": {
+		"en": "📋 Recovering saved file list (%d files).",
+		"es": "📋 Recuperando lista de ficheros guardada (%d ficheros).",
+	},
+	"list_error": {
+		"en": "Error obtaining download list: %v",
+		"es": "Error obteniendo lista de descarga: %v",
+	},
+	"state_save_error": {
+		"en": "❌ Failed to save download state: %v",
+		"es": "❌ Error guardando estado de descarga: %v",
+	},
+	"download_finished_error": {
+		"en": "⚠️  Download finished with errors: %v",
+		"es": "⚠️  La descarga finalizó con errores: %v",
+	},
+	"download_completed": {
+		"en": "✅ Download completed. Files saved to: %s",
+		"es": "✅ Descarga completada. Ficheros guardados en: %s",
+	},
+	"last_success": {
+		"en": "✅ Last successful backup: %s",
+		"es": "✅ La última copia exitosa fue el: %s",
+	},
+	"last_stats": {
+		"en": "   Files: %d | Size: %s | New photos: %d",
+		"es": "   Archivos: %d | Tamaño: %s | Nuevas fotos: %d",
+	},
+	"next_backup": {
+		"en": "⏳ Too early for new backup (Freq: %s). Next: %s",
+		"es": "⏳ No toca nueva copia todavía (Frecuencia: %s). Próxima: %s",
+	},
+	"use_force": {
+		"en": "   Use --force to ignore this check.",
+		"es": "   Usa --force para ignorar esta comprobación.",
+	},
+	"drive_mode_new": {
+		"en": "⚠️  'driveDownload' mode configured. Creating new exports in this mode is not implemented yet.",
+		"es": "⚠️  Modo 'driveDownload' configurado. La creación de nuevas exportaciones en este modo no está implementada aún.",
+	},
+	"takeout_req_error": {
+		"en": "❌ Error during Takeout request: %v",
+		"es": "❌ Error durante la solicitud de Takeout: %v",
+	},
+	"history_save_error": {
+		"en": "❌ Error saving history: %v",
+		"es": "❌ Error guardando historial: %v",
+	},
+	"history_updated": {
+		"en": "📝 History updated at: %s",
+		"es": "📝 Historial actualizado en: %s",
+	},
+	"browser_system": {
+		"en": "ℹ️  Using system browser: %s",
+		"es": "ℹ️  Usando navegador del sistema: %s",
+	},
+	"browser_download_fail": {
+		"en": "⚠️  Failed to launch system browser. Trying to download Chromium...",
+		"es": "⚠️  Falló al lanzar navegador del sistema. Intentando descargar Chromium...",
+	},
+	"progress_active": {
+		"en": "Active",
+		"es": "Activos",
+	},
+	"progress_done": {
+		"en": "Done",
+		"es": "Listos",
+	},
+	"progress_eta": {
+		"en": "ETA",
+		"es": "Tiempo",
+	},
+	"status_completed": {
+		"en": "Completed",
+		"es": "Completado",
+	},
+	"status_failed": {
+		"en": "Failed",
+		"es": "Fallido",
+	},
+	"status_downloading": {
+		"en": "Downloading",
+		"es": "Descargando",
+	},
+	"status_pending": {
+		"en": "Pending",
+		"es": "Pendiente",
+	},
+	"drive_mode_warning": {
+		"en": "⚠️  'driveDownload' mode detected. Not supported yet.",
+		"es": "⚠️  Modo 'driveDownload' detectado. Aún no está soportado.",
+	},
+	"quota_exceeded_limit": {
+		"en": "⛔ Download quota exceeded (Quota Exceeded).",
+		"es": "⛔ Límite de descargas excedido (Quota Exceeded).",
+	},
+	"quota_exceeded_action": {
+		"en": "⚠️  Marking export as EXPIRED and cleaning up partial data.",
+		"es": "⚠️  Marcando exportación como EXPIRADA y limpiando datos parciales.",
+	},
+	"discarding_bad_state": {
+		"en": "⚠️  Discarding invalid legacy file list. Will re-scan.",
+		"es": "⚠️  Descartando lista de archivos corrupta. Se re-escaneará.",
+	},
+	"migrating_state": {
+		"en": "📦 Migrating download state to separate file...",
+		"es": "📦 Migrando estado de descarga a fichero separado...",
+	},
+	"obtaining_list": {
+		"en": "Obtaining download list...",
+		"es": "Obteniendo lista de descarga...",
+	},
+	"list_saved": {
+		"en": "✅ List saved: %d files.",
+		"es": "✅ Lista guardada: %d ficheros.",
+	},
 }
 
 // Init detecta el idioma del sistema

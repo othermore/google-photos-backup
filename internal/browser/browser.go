@@ -3,9 +3,12 @@ package browser
 import (
 	"fmt"
 	"google-photos-backup/internal/i18n"
+	"google-photos-backup/internal/logger"
+	urlPkg "net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"google-photos-backup/internal/registry"
@@ -46,7 +49,7 @@ func New(userDataDir string, headless bool) *Manager {
 		Set("use-automation-extension", "false")               // Desactiva extensión de automatización
 
 	if path != "" {
-		fmt.Printf("ℹ️  Usando navegador del sistema: %s\n", path)
+		logger.Debug(i18n.T("browser_system"), path)
 		l = l.Bin(path)
 	}
 
@@ -59,7 +62,7 @@ func New(userDataDir string, headless bool) *Manager {
 	url, err := l.Launch()
 	if err != nil {
 		// Si falla, intentamos buscar el ejecutable del sistema o descargarlo
-		fmt.Printf("⚠️  Falló al lanzar navegador del sistema. Intentando descargar Chromium...\n")
+		logger.Info(i18n.T("browser_download_fail"))
 		// Recreamos el launcher básico para descargar
 		l = launcher.New().
 			UserDataDir(userDataDir).
@@ -72,6 +75,33 @@ func New(userDataDir string, headless bool) *Manager {
 
 	// Conectamos Go-Rod al navegador
 	browser := rod.New().ControlURL(url).MustConnect()
+
+	// 🕵️♂️ HIJACKER: Enforce English (hl=en) on all Takeout requests
+	// This intercepts every request to takeout.google.com and appends hl=en if missing.
+	router := browser.HijackRequests()
+	router.MustAdd("*.google.com*", func(ctx *rod.Hijack) {
+		// Only touch requests that are navigational or documents? No, all is safer for consistency.
+		// But mostly we care about the main frame.
+		// To be safe and avoid breaking APIs, let's only target takeout URLs for now.
+		currentURL := ctx.Request.URL().String()
+		if strings.Contains(currentURL, "takeout.google.com") {
+			u, err := urlPkg.Parse(currentURL)
+			if err == nil {
+				q := u.Query()
+				if q.Get("hl") != "en" {
+					q.Set("hl", "en")
+					u.RawQuery = q.Encode()
+					// Modify the URL being requested via ContinueRequest options
+					ctx.ContinueRequest(&proto.FetchContinueRequest{
+						URL: u.String(),
+					})
+					return
+				}
+			}
+		}
+		ctx.ContinueRequest(&proto.FetchContinueRequest{})
+	})
+	go router.Run()
 
 	return &Manager{
 		Browser: browser,
@@ -129,21 +159,25 @@ func (m *Manager) VerifySession() bool {
 	return strings.Contains(url, "photos.google.com")
 }
 
-// RequestTakeout automatiza la solicitud de un backup de Google Photos en Takeout
-func (m *Manager) RequestTakeout() error {
-	fmt.Println(i18n.T("navigating_takeout"))
+// RequestTakeout navigates to Takeout and requests a new export
+func (m *Manager) RequestTakeout(mode string) error {
+	// TODO: Use mode to select delivery method (Email vs Drive)
+	// For now, default to Email (Direct Download)
+	logger.Debug("🚀 Requesting new export (Mode: %s)...", mode)
+
+	logger.Debug(i18n.T("navigating_takeout"))
 	// Forzamos el idioma inglés (hl=en) para que los selectores por aria-label funcionen siempre
 	page := m.Browser.MustPage(URLTakeoutSettings)
 	page.MustWaitLoad()
 
 	// Esperar a que el botón "Deselect all" esté visible y hacer clic
-	fmt.Println(i18n.T("deselecting_products"))
+	logger.Debug(i18n.T("deselecting_products"))
 	// Usamos selectores robustos basados en atributos que Google usa internamente
 	page.MustElement(`[aria-label="Deselect all"]`).MustClick()
 	time.Sleep(1 * time.Second) // Pequeña pausa para que la UI reaccione
 
 	// Seleccionar solo Google Photos
-	fmt.Println(i18n.T("selecting_photos"))
+	logger.Debug(i18n.T("selecting_photos"))
 
 	// Estrategia robusta: Usamos XPath para buscar el texto EXACTO "Google Photos".
 	// normalize-space() elimina espacios extra y evita coincidencias parciales en descripciones de otros productos.
@@ -169,14 +203,14 @@ func (m *Manager) RequestTakeout() error {
 	}
 
 	// Ir al siguiente paso
-	fmt.Println(i18n.T("next_step"))
+	logger.Debug(i18n.T("next_step"))
 	page.MustElement(`button[aria-label="Next step"]`).MustClick()
 
 	// Esperar a que la sección de creación de exportación cargue
 	page.MustWaitLoad()
 
 	// Seleccionar 50GB para reducir número de archivos (menos ZIPs que descargar)
-	fmt.Println(i18n.T("config_size"))
+	logger.Debug(i18n.T("config_size"))
 	// Abrir menú de tamaño
 	page.MustElement(`div[aria-label="File size select"]`).MustClick()
 	time.Sleep(500 * time.Millisecond)
@@ -185,12 +219,32 @@ func (m *Manager) RequestTakeout() error {
 	time.Sleep(500 * time.Millisecond)
 
 	// Crear la exportación
-	fmt.Println(i18n.T("creating_export"))
+	logger.Debug(i18n.T("creating_export"))
+
+	// Setup navigation wait BEFORE clicking to avoid race condition
+	wait := page.MustWaitNavigation()
 	page.MustElementR("button", "Create export").MustClick()
 
-	// Esperar a la página de confirmación
-	fmt.Println(i18n.T("waiting_confirmation"))
-	page.MustWaitNavigation()
+	// Wait for navigation to complete
+	logger.Debug(i18n.T("waiting_confirmation"))
+	wait()
+
+	// Ensure we are on the Manage page
+	// Sometimes it redirects to /settings/takeout/custom/..., then eventually to /manage
+	// We'll wait for the URL to contain "manage"
+	logger.Debug("Waiting for redirect to Manage page...")
+	err := page.WaitElementsMoreThan(`div[data-in-progress="true"], button[aria-label="Cancel export"]`, 0)
+	// Or just wait for URL
+	if err != nil {
+		// Fallback: Check URL loop
+		for i := 0; i < 10; i++ {
+			if strings.Contains(page.MustInfo().URL, "manage") {
+				break
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}
+	time.Sleep(2 * time.Second) // Extra buffer for backend propagation
 
 	return nil
 }
@@ -215,21 +269,14 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	var statuses []ExportStatus
 
 	// 1. Comprobar si hay exportación en curso
-	// Buscamos el texto "Export in progress..." o "Your files are currently being prepared"
-	// Basado en el HTML proporcionado: <div class="PEJjGd">Export in progress...</div>
-	// y <div class="yrYG6">Your files are currently being prepared</div>
-
-	// Usamos HasR para buscar texto visible, es más robusto que clases ofuscadas
-	// Nota: Buscamos "Export in progress" o "files are currently being prepared"
-	// BUG FIX: Si hay varias, el texto es "Exports in progress..." (plural).
-	// En lugar de depender del texto del título, buscamos directamente los elementos de progreso.
+	// Strategy A: data-in-progress attribute (official/clean way)
 	if elements, err := page.Elements(`div[data-in-progress="true"]`); err == nil && len(elements) > 0 {
 		for _, el := range elements {
 			// Verificar si es de Google Photos
 			text, _ := el.Text()
 			if strings.Contains(text, "Google Photos") {
 				current := ExportStatus{InProgress: true}
-				fmt.Println(i18n.T("export_in_progress"))
+				logger.Debug(i18n.T("export_in_progress"))
 
 				if attr, err := el.Attribute("data-archive-id"); err == nil && attr != nil {
 					current.ID = *attr
@@ -254,6 +301,26 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 				statuses = append(statuses, current)
 			} else {
 				fmt.Println(i18n.T("ignoring_other"))
+			}
+		}
+	}
+
+	// Strategy B: Fallback - Look for "Cancel export" buttons (UI way)
+	// If Strategy A found nothing, this catches cases where attributes changed
+	if len(statuses) == 0 {
+		// Buscamos botones de cancelar, que solo aparecen en exportaciones activas
+		cancelButtons, err := page.Elements(`button[aria-label="Cancel export"]`)
+		if err == nil && len(cancelButtons) > 0 {
+			// Hay al menos una en progreso. Intentamos deducir si es de Google Photos.
+			logger.Info("⚠️  Detected 'Cancel export' button. Assuming export in progress.")
+			statuses = append(statuses, ExportStatus{InProgress: true, ID: "unknown-pending"})
+		} else {
+			// Texto plano como último recurso (English ONLY)
+			bodyText, _ := page.Element("body")
+			text, _ := bodyText.Text()
+			if strings.Contains(text, "being prepared") || strings.Contains(text, "Export in progress") {
+				logger.Info("⚠️  Detected in-progress text on page. Waiting.")
+				statuses = append(statuses, ExportStatus{InProgress: true, ID: "unknown-pending"})
 			}
 		}
 	}
@@ -318,7 +385,7 @@ func (m *Manager) CancelExport() error {
 
 	btn.MustClick()
 	time.Sleep(2 * time.Second) // Esperar a que la UI se actualice
-	fmt.Println(i18n.T("cancel_sent"))
+	logger.Info(i18n.T("cancel_sent"))
 	return nil
 }
 
@@ -381,15 +448,13 @@ func (m *Manager) GetDownloadList(id string) ([]registry.DownloadFile, error) {
 var ErrQuotaExceeded = fmt.Errorf("download quota exceeded (5 attempts limit)")
 
 // DownloadFiles downloads files in parallel (fire-and-watch) to avoid auth timeout
-func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDir string, password string, updateStatus func(int, registry.DownloadFile)) error {
+func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDir string, updateStatus func(int, registry.DownloadFile)) error {
 	url := fmt.Sprintf(URLTakeoutArchive, id)
-	fmt.Printf("⏳ Navigating to: %s\n", url)
+	logger.Debug("⏳ Navigating to: %s", url)
 
 	page := m.Browser.MustPage(url)
-	// Removed redundant page.MustWaitLoad() which might hang on some pages.
-	// Instead, we wait for the container that holds the download list.
 	fmt.Println("⏳ Waiting for page content...")
-	container := page.MustElement(`[data-export-type]`) // Waits for the main container
+	container := page.MustElement(`[data-export-type]`)
 
 	// Check for Quota Exceeded directly on the container attribute
 	fmt.Println("🔍 Checking for quota limit...")
@@ -407,81 +472,134 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 	}
 
 	if len(pendingIndices) == 0 {
-		fmt.Println("✅ No pending files to download.")
+		logger.Info("✅ No pending files to download.")
 		return nil
 	}
-	fmt.Printf("📋 Found %d pending files.\n", len(pendingIndices))
+	logger.Info("📋 Found %d pending files. Scraping URLs...", len(pendingIndices))
 
-	// Set download behavior ONCE for the page
-	proto.PageSetDownloadBehavior{
-		Behavior:     proto.PageSetDownloadBehaviorBehaviorAllow,
-		DownloadPath: destDir,
-	}.Call(page)
+	// 2. Scrape URLs Upfront (Robustness Fix)
+	// We extract map[PartNumber]URL to allow closing/ignoring the main page later
+	partMap := make(map[int]string)
 
-	// Identify buttons
-	fmt.Println("🔍 Locating download buttons...")
-	links, err := page.Elements(`a[href*="takeout/download"]`)
+	// Mutex for safe concurrent access during scraping and downloading
+	var mu sync.Mutex
+
+	// Get base URL for resolution
+	info, err := page.Info()
 	if err != nil {
-		return fmt.Errorf("failed to find links: %w", err)
+		return fmt.Errorf("failed to get page info: %v", err)
+	}
+	baseURL, err := urlPkg.Parse(info.URL)
+	if err != nil {
+		fmt.Printf("⚠️  Failed to parse base URL %s: %v\n", info.URL, err)
+		// Proceed but relative links might fail
 	}
 
-	// Filter valid links (same logic as GetDownloadList)
-	// AND rewrite hrefs to force English
-	var validLinks rod.Elements
-	for _, link := range links {
-		attr, _ := link.Attribute("aria-label")
-		if attr != nil && strings.Contains(*attr, "Download") {
-			// Rewrite href to include hl=en
-			if href, err := link.Attribute("href"); err == nil && href != nil {
-				newHref := *href
-				if !strings.Contains(newHref, "hl=en") {
-					if strings.Contains(newHref, "?") {
-						newHref += "&hl=en"
-					} else {
-						newHref += "?hl=en"
+	// Scrape elements that have the download URI and Size
+	// DOM: <div ... data-download-uri="..." data-size="...">
+	links, err := page.Elements(`[data-download-uri]`)
+	if err == nil {
+		for _, el := range links {
+			href, _ := el.Attribute("data-download-uri") // e.g. "takeout/download?..." (relative)
+			if href != nil {
+				// Resolve URL
+				finalURL := *href
+				if strings.HasPrefix(*href, "takeout/") {
+					finalURL = "/" + *href
+				}
+				if baseURL != nil {
+					if ref, err := urlPkg.Parse(finalURL); err == nil {
+						finalURL = baseURL.ResolveReference(ref).String()
 					}
-					_, _ = link.Eval(`(el, val) => el.setAttribute("href", val)`, newHref)
+				}
+
+				// Extract PartNumber from the URL/Element
+				// URL: ...&i=0&... (i=0 is part 1)
+				idx := strings.Index(finalURL, "&i=")
+				if idx == -1 {
+					idx = strings.Index(finalURL, "?i=")
+				}
+
+				if idx != -1 {
+					remaining := finalURL[idx+3:] // after "i="
+					var iParam int
+					if _, err := fmt.Sscanf(remaining, "%d", &iParam); err == nil {
+						// Check if the container or link inside is actually "See report" (Not a file part)
+						isReport := false
+						if links, err := el.Elements("a"); err == nil {
+							for _, l := range links {
+								if lbl, err := l.Attribute("aria-label"); err == nil && lbl != nil {
+									if strings.Contains(*lbl, "See report") || strings.Contains(*lbl, "Show details") {
+										isReport = true
+										break
+									}
+								}
+							}
+						}
+
+						if !isReport {
+							partNum := iParam + 1
+							partMap[partNum] = finalURL
+
+							// Also scrape SIZE if available
+							if sizeStr, err := el.Attribute("data-size"); err == nil && sizeStr != nil {
+								var sizeBytes int64
+								if _, err := fmt.Sscanf(*sizeStr, "%d", &sizeBytes); err == nil {
+									// Update file size in our list
+									mu.Lock()
+									for idx, f := range files {
+										if f.PartNumber == partNum {
+											files[idx].SizeBytes = sizeBytes
+											updateStatus(idx, files[idx])
+											break
+										}
+									}
+									mu.Unlock()
+								}
+							}
+						}
+					}
 				}
 			}
-			validLinks = append(validLinks, link)
 		}
 	}
-	fmt.Printf("found %d valid 'Download' buttons\n", len(validLinks))
+	logger.Debug("📋 Scraped %d valid download links.", len(partMap))
 
 	// 3. Setup Channels for Coordination
-	// We need to stop waiting if an error occurs (like Quota Exceeded)
 	errChan := make(chan error, 1)
 	doneChan := make(chan struct{})
 
-	// 4. Setup Global Listener
+	// 4. Setup Global Listener (Browser Level)
 	guidMap := make(map[string]int)
-	completedCount := 0
+	processedCount := 0 // successes + failures
 	totalToDownload := len(pendingIndices)
+	allProcessedChan := make(chan struct{}, 1)
 
-	// wait() blocks until the callbacks return true
-	// We run it in a goroutine so we can interrupt it if we detect Quota Exceeded
+	checkDone := func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		logger.Debug("[DEBUG] checkDone: processed %d / %d", processedCount, totalToDownload)
+		if processedCount >= totalToDownload {
+			select {
+			case allProcessedChan <- struct{}{}:
+			default:
+			}
+			return true
+		}
+		return false
+	}
+
+	// Wait loop using Browser.EachEvent
 	go func() {
 		defer close(doneChan)
-		page.EachEvent(
+		// We use m.Browser, not page
+		wait := m.Browser.EachEvent(
 			func(e *proto.PageDownloadWillBegin) bool {
 				idx := -1
 				// Match by PartNumber suffix in filename?
-				// e.SuggestedFilename: "takeout-...-003.zip"
-				// files[i].Filename might be empty or "takeout-...-003.zip"
-				// We need to map SuggestedFilename to our files list
-				// Simple heuristic: Extract part number from SuggestedFilename
-				// format: ...-NNN.zip
-				// We look for files with matching PartNumber
-
-				// Let's iterate files to find matching part number
-				// This assumes standard Takeout naming: match the NNN part
-				// e.g. "takeout-20240201-001.zip"
-
-				// Helper to extract NNN
 				parts := strings.Split(strings.TrimSuffix(e.SuggestedFilename, ".zip"), "-")
 				if len(parts) > 0 {
-					lastPart := parts[len(parts)-1] // "001"
-					// Wait, Sscanf is tricky. usage: fmt.Sscanf("001", "%d", &num)
+					lastPart := parts[len(parts)-1]
 					var pNum int
 					if _, err := fmt.Sscanf(lastPart, "%d", &pNum); err == nil {
 						// Find file with PartNumber == pNum
@@ -495,10 +613,12 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 				}
 
 				if idx != -1 {
+					mu.Lock()
 					guidMap[e.GUID] = idx
 					files[idx].Filename = e.SuggestedFilename
 					files[idx].Status = "downloading"
 					files[idx].URL = e.URL
+					mu.Unlock()
 					fmt.Printf("\n     ... Started: %s\n", e.SuggestedFilename)
 					updateStatus(idx, files[idx])
 				} else {
@@ -507,106 +627,304 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 				return false
 			},
 			func(e *proto.PageDownloadProgress) bool {
-				if idx, ok := guidMap[e.GUID]; ok {
+				mu.Lock()
+				idx, ok := guidMap[e.GUID]
+				mu.Unlock()
+
+				if ok {
 					if e.State == proto.PageDownloadProgressStateCompleted {
+						mu.Lock()
 						files[idx].Status = "completed"
 						files[idx].DownloadedBytes = int64(e.ReceivedBytes)
 						files[idx].SizeBytes = int64(e.TotalBytes)
-						updateStatus(idx, files[idx])
-						completedCount++
+						processedCount++
+						mu.Unlock()
 
-						if completedCount >= totalToDownload {
+						// Attempt to move file
+						homeDir, err := os.UserHomeDir()
+						if err == nil {
+							downloadPath := filepath.Join(homeDir, "Downloads", files[idx].Filename)
+							targetPath := filepath.Join(destDir, files[idx].Filename)
+
+							// Check if file exists in Downloads
+							if _, err := os.Stat(downloadPath); err == nil {
+								if err := os.Rename(downloadPath, targetPath); err != nil {
+									fmt.Printf("\n⚠️  Failed to move file from %s to %s: %v\n", downloadPath, targetPath, err)
+								}
+							}
+						}
+
+						updateStatus(idx, files[idx])
+						if checkDone() {
 							return true
 						}
 					} else if e.State == proto.PageDownloadProgressStateCanceled {
+						mu.Lock()
 						files[idx].Status = "failed"
+						processedCount++
+						mu.Unlock()
+
 						updateStatus(idx, files[idx])
-						completedCount++
-						if completedCount >= totalToDownload {
+						if checkDone() {
 							return true
 						}
 					} else {
 						// Active
+						mu.Lock()
 						files[idx].DownloadedBytes = int64(e.ReceivedBytes)
 						files[idx].SizeBytes = int64(e.TotalBytes)
+						mu.Unlock()
 						updateStatus(idx, files[idx])
 					}
 				}
 				return false
 			},
-		)()
+		)
+		wait()
 	}()
 
-	// 3. Fire Clicks in Background
+	// 5. Fire Downloads via Button Click (Sequential)
+	// We run this in a goroutine so the main thread can block on the done/error channels
+	// Helper to track active downloads
+	getActive := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		c := 0
+		for _, f := range files {
+			if f.Status == "downloading" {
+				c++
+			}
+		}
+		return c
+	}
+
+	// 5. Fire Downloads via Button Click (Sequential with Throttling)
+	// We run this in a goroutine so the main thread can block on the done/error channels
 	go func() {
-		fmt.Println("🚀 Firing download requests...")
-		for _, fileIdx := range pendingIndices {
-			partNum := files[fileIdx].PartNumber
-			if partNum > len(validLinks) {
-				fmt.Printf("❌ Link not found for part %d\n", partNum)
-				continue
+		logger.Debug("🚀 Firing download requests via Button Click (Robust JS)...")
+
+		// Helper to click a file and check for errors (Quota/Modal)
+		clickFileWithCheck := func(fileIdx int) bool {
+			pNum := files[fileIdx].PartNumber
+
+			// 1. Ensure we are on the correct page (recover from Auth redirects) and LANGUAGE is English
+			currentInfo, err := page.Info()
+			currentURL := "unknown"
+			if currentInfo != nil {
+				currentURL = currentInfo.URL
 			}
 
-			btn := validLinks[partNum-1]
+			// Validate URL path and Query param (hl=en)
+			// If missing hl=en, we reload to ensure English text for error detection
+			if err != nil || !strings.Contains(currentURL, "takeout.google.com/manage/archive") || !strings.Contains(currentURL, "hl=en") {
+				logger.Debug("⚠️  Page context/lang lost (URL: %s). Navigating back to list with hl=en...", currentURL)
 
-			// Clean partials first
-			globPattern := filepath.Join(destDir, fmt.Sprintf("*-%03d.zip.crdownload", partNum))
+				// Ensure target URL has hl=en
+				targetURL := url
+				if !strings.Contains(targetURL, "hl=en") {
+					if strings.Contains(targetURL, "?") {
+						targetURL += "&hl=en"
+					} else {
+						targetURL += "?hl=en"
+					}
+				}
+
+				page.MustNavigate(targetURL)
+				page.MustWaitLoad()
+				time.Sleep(5 * time.Second) // Stabilize
+			}
+
+			logger.Debug("   ... Clicking button for part %d...", pNum)
+
+			// Clean partials
+			globPattern := filepath.Join(destDir, fmt.Sprintf("*-%03d.zip.crdownload", pNum))
 			if partials, _ := filepath.Glob(globPattern); len(partials) > 0 {
 				for _, p := range partials {
 					os.Remove(p)
 				}
 			}
 
-			// Click
-			// We accept that this might trigger auth.
-			// If we do strict parallel, we might race on auth input.
-			// But usually auth is once per session.
-			// We add a small delay to be gentle and allow auth check to potentially appear
-			// If auth appears, it blocks.
-
-			// Check for Auth Prompt BEFORE clicking? No, it appears AFTER.
-			// If Auth appears, we should probably handle it.
-			// But handling 17 auths?
-			// Hopefully only the first one triggers it.
-
-			// We use a retry mechanism for the click?
-			if err := btn.Click(proto.InputMouseButtonLeft, 1); err != nil {
-				fmt.Printf("❌ Failed to click part %d: %v\n", partNum, err)
-
-				// Check for Quota Exceeded in URL (Strongest Signal)
-				if info, err := page.Info(); err == nil && strings.Contains(info.URL, "quotaExceeded=true") {
-					fmt.Println("⛔ Detected Quota Exceeded via URL parameter.")
-					errChan <- ErrQuotaExceeded
-					return
+			// 2. Click via JS
+			jsScript := fmt.Sprintf(`() => {
+				const links = Array.from(document.querySelectorAll('a[href*="takeout/download"]'));
+				const target = links.find(l => {
+					if (!l.href.includes("i=%d")) return false;
+					const label = l.getAttribute("aria-label") || "";
+					if (label.includes("See report") || label.includes("Show details")) return false;
+					return true;
+				});
+				if (target) {
+					target.click();
+					return true;
 				}
+				return false;
+			}`, pNum-1)
 
-				// Check for Quota Exceeded in Page Content (English or Spanish)
-				// Spanish: "No puedes volver a descargar"
-				html, _ := page.HTML()
-				if strings.Contains(html, "data-download-quota-exceeded=\"true\"") ||
-					strings.Contains(html, "No puedes volver a descargar") {
-					fmt.Println("⛔ Detected Quota Exceeded via Page Content.")
-					errChan <- ErrQuotaExceeded
-					return
-				}
-
-				files[fileIdx].Status = "failed"
-				updateStatus(fileIdx, files[fileIdx])
-				// We still continue to trigger others? Yes.
+			res, err := page.Eval(jsScript)
+			if err != nil {
+				fmt.Printf("❌ JS Execution failed for part %d: %v\n", pNum, err)
+				return false
 			}
 
-			// Quick auth check
-			// m.handleAuth(password) // This looks for input on the page.
+			// Check if click was successful
+			if res != nil && res.Value.Bool() {
+				// Check for Quota Modal or URL Redirect error immediately after click
+				time.Sleep(2 * time.Second) // Give modal time to appear or redirect to happen
 
-			time.Sleep(2 * time.Second) // Small delay between fires
+				// 3. Check URL for Error Flags (Robust against Language)
+				if info, err := page.Info(); err == nil {
+					postClickURL := info.URL
+					if strings.Contains(postClickURL, "quotaExceeded=true") {
+						logger.Error("⛔ Quota Exceeded detected via URL Param for part %d! Aborting export.", pNum)
+						mu.Lock()
+						files[fileIdx].Status = "failed"
+						mu.Unlock()
+
+						// Signal Fatal Error to Main Thread
+						select {
+						case errChan <- ErrQuotaExceeded:
+						default:
+						}
+
+						return false
+					}
+
+					// User reported redirects to Spanish pages without hl=en
+					// If we were redirected to a new page (e.g. error page) and lost hl=en, force reload
+					// But only if we are still on Takeout
+					if strings.Contains(postClickURL, "takeout.google.com") && !strings.Contains(postClickURL, "hl=en") {
+						logger.Debug("⚠️  Redirected to non-English page (URL: %s). Reloading with hl=en...", postClickURL)
+						newURL := postClickURL
+						if strings.Contains(newURL, "?") {
+							newURL += "&hl=en"
+						} else {
+							newURL += "?hl=en"
+						}
+						page.MustNavigate(newURL)
+						page.MustWaitLoad()
+						time.Sleep(2 * time.Second)
+					}
+				}
+
+				// Check for the specific modal DOM user provided
+				// role="dialog" and text "You can't download this file again"
+				// We search for the header text h2[id="c1"] or just headers
+				// User validated that we should rely on English by ensuring hl=en
+				modalScript := `() => {
+					const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+					for (const d of dialogs) {
+						const text = d.innerText.toLowerCase();
+						if (text.includes("you can't download this file again") || 
+							text.includes("maximum number of times") ||
+							text.includes("quota exceeded")) {
+							return true;
+						}
+					}
+					return false;
+				}`
+				modalRes, _ := page.Eval(modalScript)
+				if modalRes != nil && modalRes.Value.Bool() {
+					logger.Error("⛔ Quota Exceeded detected (Modal) for part %d! Aborting export.", pNum)
+					// Handle Fatal Error
+					mu.Lock()
+					files[fileIdx].Status = "failed"
+					mu.Unlock()
+
+					// Signal Fatal Error to Main Thread
+					select {
+					case errChan <- ErrQuotaExceeded:
+					default:
+					}
+
+					return false
+				}
+
+				return true
+			}
+			return false
 		}
-		fmt.Println("✅ Download requests firing phase completed.") // Changed message
+
+		// PHASE 1: WARM-UP (First file only)
+		if len(pendingIndices) > 0 {
+			firstIdx := pendingIndices[0]
+			partNum := files[firstIdx].PartNumber
+			logger.Info("🔑 Warm-up: Starting first download (Part %d) to validate session...", partNum)
+
+			if clickFileWithCheck(firstIdx) {
+				// Wait for it to become "downloading"
+				logger.Info("⏳ Waiting for download to start (Check browser for Passkey)...")
+				timeout := time.After(2 * time.Minute)
+				ticker := time.NewTicker(2 * time.Second)
+				started := false
+
+				for !started {
+					select {
+					case <-timeout:
+						logger.Info("⚠️  Timed out waiting for first download. Proceeding anyway...")
+						started = true
+					case <-ticker.C:
+						mu.Lock()
+						status := files[firstIdx].Status
+						if status == "downloading" || status == "completed" {
+							started = true
+						} else if status == "failed" {
+							// Check if it failed due to our logic above
+							started = true
+						}
+						mu.Unlock()
+					}
+				}
+				ticker.Stop()
+			}
+		}
+
+		// PHASE 2: REST OF FILES (Throttled)
+		// Start from index 1 (since 0 is done in warm-up)
+		startLoop := 1
+		if len(pendingIndices) <= 1 {
+			startLoop = len(pendingIndices) // nothing left
+		}
+
+		maxConcurrent := 2 // Limit parallel downloads
+
+		for i := startLoop; i < len(pendingIndices); i++ {
+			fileIdx := pendingIndices[i]
+			partNum := files[fileIdx].PartNumber
+
+			// Throttle: Wait if too many active
+			for getActive() >= maxConcurrent {
+				logger.Debug("⏳ Max concurrent downloads (%d) reached. Waiting...", maxConcurrent)
+				time.Sleep(10 * time.Second)
+			}
+
+			// Use the helper logic
+			success := clickFileWithCheck(fileIdx)
+
+			if success {
+				logger.Debug("✅ Click successful for part %d", partNum)
+				time.Sleep(15 * time.Second) // Slow down
+			} else {
+				logger.Debug("⚠️  Click failed (JS false or Quota detected) for part %d. Skipping.", partNum)
+				mu.Lock()
+				files[fileIdx].Status = "failed"
+				processedCount++
+				mu.Unlock()
+				updateStatus(fileIdx, files[fileIdx])
+				checkDone()
+			}
+		}
+		logger.Debug("✅ Download requests firing phase completed.")
+
+		if checkDone() {
+			// Trigger a check just in case
+		}
 	}()
 
-	// 4. Wait for all to finish
 	// 6. Wait for Completion or Error
 	select {
-	case <-doneChan:
+	case <-doneChan: // from EachEvent (wait returns)
+		return nil
+	case <-allProcessedChan: // all files accounted for
 		return nil
 	case err := <-errChan:
 		return err
@@ -638,4 +956,32 @@ func (m *Manager) handleAuth(password string) {
 func (m *Manager) DownloadExport(id string, destDir string) (int, string, error) {
 	// Wrapping new logic for compatibility if needed, else delete.
 	return 0, "", fmt.Errorf("use DownloadFiles instead")
+}
+
+// ParseSize parses human readable size string (e.g. "50 GB", "10.5 MB") into bytes
+func ParseSize(s string) int64 {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	if s == "" {
+		return 0
+	}
+	var val float64
+	var unit string
+	// Try parsing with unit
+	if _, err := fmt.Sscanf(s, "%f %s", &val, &unit); err != nil {
+		// Fallback for just numbers?
+		return 0
+	}
+
+	multiplier := int64(1)
+	switch unit {
+	case "KB", "K":
+		multiplier = 1024
+	case "MB", "M":
+		multiplier = 1024 * 1024
+	case "GB", "G":
+		multiplier = 1024 * 1024 * 1024
+	case "TB", "T":
+		multiplier = 1024 * 1024 * 1024 * 1024
+	}
+	return int64(val * float64(multiplier))
 }

@@ -1,7 +1,8 @@
 package config
 
 import (
-	"fmt"
+	"google-photos-backup/internal/i18n"
+	"google-photos-backup/internal/logger"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -18,8 +19,13 @@ type Config struct {
 	ClientSecret    string        `mapstructure:"client_secret"`
 	TokenPath       string        `mapstructure:"token_path"`
 	BackupFrequency time.Duration `mapstructure:"backup_frequency"`
-	Password        string        `mapstructure:"password"` // For auto-reauthentication
+	DownloadMode    string        `mapstructure:"download_mode"` // "directDownload" or "driveDownload"
 }
+
+const (
+	ModeDirectDownload = "directDownload"
+	ModeDriveDownload  = "driveDownload"
+)
 
 var AppConfig Config
 
@@ -42,6 +48,7 @@ func InitConfig() {
 	viper.SetDefault("backup_path", "./backup")
 	viper.SetDefault("index_path", "./index.jsonl")
 	viper.SetDefault("backup_frequency", "168h") // 7 días (24*7)
+	viper.SetDefault("download_mode", ModeDirectDownload)
 
 	// Definimos ruta por defecto para el token dentro del directorio de config
 	if home, err := os.UserHomeDir(); err == nil {
@@ -52,15 +59,15 @@ func InitConfig() {
 	// 4. Intentar leer
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			fmt.Println("Aviso: No se encontró fichero config.yaml. Se usarán valores por defecto.")
+			logger.Info(i18n.T("config_missing"))
 		} else {
-			fmt.Printf("Error leyendo config: %s\n", err)
+			logger.Error(i18n.T("config_read_error"), err)
 			os.Exit(1)
 		}
 	}
 
 	// 5. Cargar en estructura
 	if err := viper.Unmarshal(&AppConfig); err != nil {
-		fmt.Printf("Error decodificando config: %s\n", err)
+		logger.Error(i18n.T("config_decode_error"), err)
 	}
 }
