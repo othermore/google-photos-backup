@@ -50,6 +50,24 @@ Sigue las instrucciones. Esto autorizará a la herramienta a acceder a tus datos
 
 La configuración se almacena en `~/.config/google-photos-backup/config.yaml`.
 
+**Opciones Disponibles:**
+
+| Clave | Valor por Defecto | Descripción |
+| :--- | :--- | :--- |
+| `backup_path` | `./backup` | Directorio principal donde se guardarán las copias. |
+| `backup_frequency` | `168h` | Frecuencia para solicitar nuevas copias (ej. `24h`, `168h` = 7 días). |
+| `download_mode` | `directDownload` | Modo de operación. Actualmente solo se soporta `directDownload`. |
+| `user_data_dir` | (auto) | Ruta al perfil de usuario de Chrome (no cambiar salvo necesario). |
+
+## Integridad de Datos
+
+Para asegurar la seguridad y evitar conflictos:
+1.  **`history.json`**: Fuente de la verdad de las exportaciones. Modificado por `sync`, solo lectura para `process`.
+2.  **`state.json`**: Ubicado en cada carpeta de descarga (ej. `downloads/ID_XXX/state.json`), rastrea el progreso de cada ZIP. Contiene:
+    *   `files`: Lista de archivos esperados.
+    *   *Restricción*: El comando `process` valida ESTRICTAMENTE que el estado sea "completed" y el tamaño coincida antes de extraer.
+3.  **`processing_index.json`**: Mantenido por `process`, rastrea qué exportaciones y archivos han sido procesados para evitar duplicados.
+
 ## Uso
 
 ### 1. Sync (Comando Principal)
@@ -95,5 +113,13 @@ El sistema gestiona el ciclo de vida de cada Takeout mediante estados en `histor
 *   **`expired`**: La exportación caducó en los servidores de Google.
 *   **`cancelled`**: Cancelada por el usuario o el sistema.
 *   **`failed`**: Google falló al generar la exportación.
+
+## Solución de Problemas
+
+*   **Problemas de Login:** Si la herramienta se queda atascada verificando la sesión, prueba a ejecutar `./gpb configure` de nuevo y asegúrate de completar el proceso en la ventana del navegador.
+*   **"Quota Exceeded":** Google limita el número de veces que puedes descargar un archivo (usualmente 5-10 veces). Si ocurre este error, la herramienta marcará la exportación como expirada y solicitará una nueva en la siguiente ejecución.
+*   **Modo Verbose:** Ejecuta con `./gpb sync -v` para ver exactamente qué está haciendo la automatización del navegador.
+
+## Créditos
 
 Desarrollado por http://antonio.mg con la ayuda de gemini
