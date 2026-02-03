@@ -3,40 +3,40 @@
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
-Aplicación de línea de comandos (CLI) para realizar copias de seguridad locales e incrementales de tu biblioteca de Google Photos.
+Herramienta CLI para realizar copias de seguridad locales e incrementales de tu librería de Google Photos.
 
-Diseñada para ser ejecutada manualmente o mediante Cron en servidores Linux (Debian, RedHat, etc.) y macOS.
+Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, RedHat, etc.) y macOS.
 
 ## Características
 
-* **Takeout Automatizado:** Automatiza la solicitud y descarga de copias de seguridad completas desde Google Takeout.
-* **Calidad Original:** Garantiza la descarga de los archivos originales con todos sus metadatos.
-* **Organización Inteligente:** Procesa los archivos descargados para corregir fechas EXIF (usando los JSON de Google) y organiza las fotos en álbumes.
-* **Headless:** Configurable mediante archivos, ideal para servidores sin interfaz gráfica.
+* **Takeout Automatizado:** Automatiza la solicitud y descarga de copias completas vía Google Takeout.
+* **Calidad Original:** Asegura la descarga de archivos originales con metadatos completos.
+* **Organización Inteligente:** Procesa los archivos descargados para corregir fechas EXIF (usando los JSONs de Google) y organiza fotos en álbumes.
+* **Headless:** Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
 * **Descarga Robusta:**
     * Reanuda descargas interrumpidas automáticamente.
-    * Gestiona errores de "Cuota Excedida" marcando exportaciones como expiradas.
-    * Valida el tamaño de los ficheros antes de marcarlos como completados.
+    * Maneja errores de "Quota Exceeded" marcando exportaciones como expiradas.
+    * Valida tamaños de archivo antes de marcarlos como completos.
 * **Experiencia de Usuario:**
-    * Panel de progreso detallado con Velocidad y Tiempo Restante (ETA).
-    * Opción de salida detallada (verbose) para depuración.
+    * Dashboard de progreso detallado con Velocidad y Tiempo Restante (ETA).
+    * Opción de salida detallada (`verbose`) para depuración.
     * Internacionalizado (Inglés/Español).
 
 ## Instalación
 
-### Desde el código fuente (requiere Go 1.20+)
+### Desde el código fuente (Requiere Go 1.20+)
 
 ```bash
-git clone https://github.com/tu-usuario/google-photos-backup.git
+git clone https://github.com/your-username/google-photos-backup.git
 cd google-photos-backup
 go build -o gpb main.go
 ```
 
 ## Configuración
 
-La aplicación utiliza un navegador automatizado (Chrome/Chromium). La primera vez necesitarás iniciar sesión manualmente para guardar la sesión.
+La aplicación utiliza un navegador automatizado (Chrome/Chromium). Necesitarás iniciar sesión manualmente la primera vez para guardar la sesión.
 
-### Configuración Inicial
+### Setup
 
 Ejecuta el asistente de configuración:
 
@@ -44,54 +44,56 @@ Ejecuta el asistente de configuración:
 ./gpb configure
 ```
 
-Sigue las instrucciones en pantalla para autorizar a la herramienta a acceder a tus datos de Google Takeout.
+Sigue las instrucciones. Esto autorizará a la herramienta a acceder a tus datos de Google Takeout.
 
 ### Archivo de Configuración
 
-La configuración se guarda en `~/.config/google-photos-backup/config.yaml`.
-
-**Opciones Disponibles:**
-
-| Clave | Por Defecto | Descripción |
-| :--- | :--- | :--- |
-| `backup_path` | `./backup` | Directorio principal donde se guardarán las copias. |
-| `backup_frequency` | `168h` | Frecuencia para solicitar nuevas copias (ej: `24h`, `168h` = 7 días). |
-| `download_mode` | `directDownload` | Modo de operación. Actualmente solo se soporta `directDownload`. |
-| `user_data_dir` | (auto) | Ruta al perfil de usuario de Chrome (no cambiar salvo necesidad). |
+La configuración se almacena en `~/.config/google-photos-backup/config.yaml`.
 
 ## Uso
 
-### 1. Sincronizar (Comando Principal)
+### 1. Sync (Comando Principal)
 
-Comprueba el estado de tus exportaciones y gestiona el flujo (Solicitar -> Esperar -> Descargar).
+Comprueba el estado de tus exportaciones y maneja el flujo (Solicitar -> Esperar -> Descargar).
 
 ```bash
 ./gpb sync [flags]
 ```
 
-**Flags (Opciones):**
+**Flags:**
 
-* `-v, --verbose`: Activa el registro detallado (muestra clics del navegador, URLs de navegación, etc.).
-* `--force`: Ignora la comprobación de `backup_frequency` y fuerza una nueva solicitud de exportación inmediatamente.
+* `-v, --verbose`: Activa log detallado de depuración.
+* `--force`: Ignora el chequeo de frecuencia (`backup_frequency`) y fuerza una nueva solicitud inmediatamente.
 
-### Cómo Funciona
+### 2. Process (Organización)
 
-1.  **Comprobar Estado:** La herramienta inicia sesión en Google Takeout para buscar exportaciones activas.
-    *   **En Progreso:** Si se está creando una, espera. Si lleva más de 48h, la cancela.
-    *   **Lista:** Si hay una lista (`Download` disponible), comienza a descargar.
-    *   **Ninguna:** Si no hay exportación activa y ha pasado el tiempo de frecuencia, solicita una nueva (50GB divididos).
-2.  **Descarga:**
-    *   Los archivos se descargan inicialmente en la carpeta de Descargas del sistema.
-    *   Se mueven automáticamente a `<backup_path>/downloads/<ID_EXPORTACION>/`.
-    *   Un archivo `.download_state.json` rastrea el progreso, permitiendo reanudar si se interrumpe.
-3.  **Finalización:**
-    *   Una vez descargados todos los archivos, se actualiza el índice `history.json`.
+Una vez descargados los archivos, este comando extrae, corrige metadatos y organiza.
 
-## Solución de Problemas
+```bash
+./gpb process [flags]
+```
 
-*   **Problemas de Login:** Si la herramienta se atasca verificando la sesión, prueba a ejecutar `./gpb configure` de nuevo y asegúrate de completar el login en la ventana del navegador.
-*   **"Quota Exceeded" (Cuota Excedida):** Google limita el número de veces que puedes descargar un archivo Takeout (usualmente 5-10 veces). Si ocurre este error, la herramienta marcará la exportación como expirada y solicitará una nueva en la siguiente ejecución.
-*   **Modo Verbose:** Ejecuta con `gpb sync -v` para ver exactamente qué está haciendo la automatización del navegador.
+**Flujo de Trabajo:**
+1.  **Extracción**: Descomprime nuevos archivos encontrados en `downloads/` a un subdirectorio `raw/`.
+2.  **Corrección de Metadatos**: Usa los ficheros JSON de Google para corregir la "Fecha de Modificación" de tus imágenes/videos.
+3.  **Deduplicación Global**: Escanea todos los ficheros, identifica duplicados (SHA256) y mantiene la mejor versión (priorizando nombres de álbum). Los duplicados se reemplazan con enlaces simbólicos relativos.
 
-## Créditos
-Desarrollado por http://antonio.mg con ayuda de gemini
+**Flags:**
+
+*   `--force-metadata`: Re-ejecuta la corrección de fechas en exportaciones ya procesadas. Usa un escaneo "ligero" (rápido) sin recalcular hashes.
+*   `--force-dedup`: Re-ejecuta la comprobación de duplicados. Fuerza un escaneo SHA256 completo para asegurar la integridad del índice.
+*   `--force-extract`: Re-extrae los archivos comprimidos. Sobreescribe lo existente.
+*   `--export <ID>`: Procesa SOLO el ID de exportación especificado.
+
+## Ciclo de Vida de una Exportación
+
+El sistema gestiona el ciclo de vida de cada Takeout mediante estados en `history.json`:
+
+*   **`requested`**: Solicitud iniciada pero no confirmada por Google.
+*   **`in_progress`**: Google está preparando los archivos.
+*   **`ready`**: Archivos listos para descargar.
+*   **`expired`**: La exportación caducó en los servidores de Google.
+*   **`cancelled`**: Cancelada por el usuario o el sistema.
+*   **`failed`**: Google falló al generar la exportación.
+
+Desarrollado por http://antonio.mg con la ayuda de gemini

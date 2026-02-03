@@ -59,6 +59,27 @@ The config is stored at `~/.config/google-photos-backup/config.yaml`.
 | `download_mode` | `directDownload` | Mode of operation. Currently only `directDownload` is supported. |
 | `user_data_dir` | (auto) | Path to Chrome user profile data (do not change unless necessary). |
 
+## Export Status Lifecycle
+
+The system manages the lifecycle of each Takeout through various statuses in `history.json`:
+
+*   **`requested`**: Request initiated but not yet confirmed by Google.
+*   **`in_progress`**: Google is preparing the archives. `sync` monitors this state.
+*   **`ready`**: Google completed preparation. Files are ready to download (or have been downloaded).
+    *   *Note*: `sync` downloads files in this state. `process` only acts on `ready` exports that are fully downloaded (verified via `state.json`).
+*   **`expired`**: The export expired on Google's servers and cannot be downloaded.
+*   **`cancelled`**: Export cancelled by user or system.
+*   **`failed`**: Google failed to generate the export.
+
+### Data Integrity
+
+To ensure safety and avoid conflicts:
+1.  **`history.json`**: Source of truth for exports. Modified by `sync`, read-only for `process`.
+2.  **`state.json`**: Located in each download folder (e.g., `downloads/ID_XXX/state.json`), tracks download progress of individual ZIP files. It contains:
+    *   `files`: List of expected files. Each has `status` ("completed", "pending"), `size_bytes` (expected size), and `downloaded_bytes`.
+    *   *Constraint*: The `process` command STRICTLY validates that `status` is "completed" and `size_bytes` matches the actual file size before extracting.
+3.  **`processing_index.json`**: Maintained by `process`, tracks which exports and files have been processed and organized to prevent duplicates.
+
 ## Usage
 
 ### 1. Sync (Main Command)
@@ -74,7 +95,28 @@ Checks the status of your exports and handles the flow (Request -> Wait -> Downl
 * `-v, --verbose`: Enable detailed debug logging (shows browser clicks, navigation URLs, etc.).
 * `--force`: Ignore the `backup_frequency` check and force a new export request immediately.
 
+### 2. Process (Organization)
+
+After `sync` downloads the files, this command extracts, fixes metadata, and organizes them.
+
+```bash
+./gpb process [flags]
+```
+
+**Workflow:**
+1.  **Extraction**: Unzips new archives found in `downloads/` to a `raw/` subdirectory.
+2.  **Metadata Correction**: Uses Google's JSON sidecar files to fix the "Date Modified" of your images/videos.
+3.  **Global Deduplication**: Scans all processed files, identifies duplicates (SHA256), and keeps the best version (prioritizing album names). Duplicates are replaced with relative symlinks to save space.
+
+**Flags:**
+
+*   `--force-metadata`: Re-runs date correction on already processed exports. Uses a "light" scan (fast) without re-hashing files.
+*   `--force-dedup`: Re-runs the duplicate check. Forces a full SHA256 scan of existing files to ensure index integrity.
+*   `--force-extract`: Re-extracts archives. Overwrites existing files.
+*   `--export <ID>`: Runs processing ONLY on the specified Export UUID.
+
 ### How it Works
+
 
 1.  **Check Status:** The tool logs into Google Takeout to check for active exports.
     *   **In Progress:** If an export is creating, it waits. If it's older than 48h, it cancels it.
