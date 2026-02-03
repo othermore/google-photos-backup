@@ -24,7 +24,9 @@ func init() {
 	rootCmd.AddCommand(configureCmd)
 	rootCmd.AddCommand(syncCmd)
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().Bool("non-interactive", false, "Disable interactive UI (progress bars)")
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("non_interactive", rootCmd.PersistentFlags().Lookup("non-interactive"))
 }
 
 func Execute() {

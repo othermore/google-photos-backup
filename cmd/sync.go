@@ -144,6 +144,10 @@ func (pt *ProgressTracker) Render() {
 		case "downloading":
 			statusIcon = "⏳"
 			statusText = i18n.T("status_downloading")
+			if fPercent > 99.9 && f.SizeBytes > 0 {
+				statusIcon = "💿"
+				statusText = "Finalizando"
+			}
 		}
 
 		fCurrentMB := float64(f.DownloadedBytes) / 1024 / 1024
@@ -339,13 +343,6 @@ var syncCmd = &cobra.Command{
 				return
 			}
 
-			count, size, err := bm.DownloadExport(completedStatus.ID, downloadDir)
-			// DEPRECATED: Using new flow below.
-			// Ideally we remove above lines.
-			_ = count
-			_ = size
-			_ = err
-
 			// NEW FLOW:
 			logger.Info(i18n.T("starting_manager"))
 
@@ -388,6 +385,22 @@ var syncCmd = &cobra.Command{
 			if state, err := registry.LoadDownloadState(statePath); err == nil {
 				filesToDownload = state.Files
 				logger.Info(i18n.T("recovering_list"), len(filesToDownload))
+
+				// Check if any file is already downloaded (100% size) but not marked
+				for i, f := range filesToDownload {
+					if f.Status != "completed" && f.SizeBytes > 0 {
+						targetFile := filepath.Join(downloadDir, f.Filename)
+						// Check local file
+						if info, err := os.Stat(targetFile); err == nil {
+							if info.Size() >= f.SizeBytes {
+								logger.Info("✅ Found completed file: %s (Size: %s)", f.Filename, browser.FormatSize(info.Size()))
+								filesToDownload[i].Status = "completed"
+								filesToDownload[i].DownloadedBytes = info.Size()
+								// If we found it valid, ensure we don't try to download it again
+							}
+						}
+					}
+				}
 			}
 
 			// 3. If no state, fetch from Browser
@@ -432,15 +445,36 @@ var syncCmd = &cobra.Command{
 				TotalExportSize: browser.ParseSize(entry.TotalSize),
 				Files:           filesToDownload,
 			}
-			tracker.Render() // Initial render
+
+			nonInteractive := viper.GetBool("non_interactive")
+			if !nonInteractive {
+				tracker.Render() // Initial render
+			} else {
+				logger.Info("📦 Export Set Detected: %d files, Total: %s", len(filesToDownload), entry.TotalSize)
+			}
 
 			err = bm.DownloadFiles(completedStatus.ID, filesToDownload, downloadDir, func(idx int, updatedFile registry.DownloadFile) {
+				// Detect status changes for logging BEFORE updating memory
+				oldStatus := filesToDownload[idx].Status
+				newStatus := updatedFile.Status
+
+				if nonInteractive {
+					if oldStatus != "downloading" && newStatus == "downloading" {
+						logger.Info("⬇️  Starting: %s (%s)", updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
+					}
+					if oldStatus != "completed" && newStatus == "completed" {
+						logger.Info("✅ Finished: %s (%s)", updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
+					}
+				}
+
 				// Update in memory list
 				filesToDownload[idx] = updatedFile
 				tracker.Files = filesToDownload // Sync files to tracker (ref)
 
 				// Re-render
-				tracker.Render()
+				if !nonInteractive {
+					tracker.Render()
+				}
 
 				// Save state to disk
 				state := registry.DownloadState{

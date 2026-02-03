@@ -467,6 +467,10 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 	var pendingIndices []int
 	for i, f := range files {
 		if f.Status != "completed" {
+			// If file was failed previously, reset it to pending so we retry it
+			if f.Status == "failed" {
+				files[i].Status = ""
+			}
 			pendingIndices = append(pendingIndices, i)
 		}
 	}
@@ -589,6 +593,9 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 		return false
 	}
 
+	// Track last activity for stall detection
+	lastActivity := make(map[int]time.Time)
+
 	// Wait loop using Browser.EachEvent
 	go func() {
 		defer close(doneChan)
@@ -618,6 +625,11 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 					files[idx].Filename = e.SuggestedFilename
 					files[idx].Status = "downloading"
 					files[idx].URL = e.URL
+
+					if lastActivity != nil {
+						lastActivity[idx] = time.Now()
+					}
+
 					mu.Unlock()
 					fmt.Printf("\n     ... Started: %s\n", e.SuggestedFilename)
 					updateStatus(idx, files[idx])
@@ -633,6 +645,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 				if ok {
 					if e.State == proto.PageDownloadProgressStateCompleted {
+						// ... (Completion logic same as before)
 						mu.Lock()
 						files[idx].Status = "completed"
 						files[idx].DownloadedBytes = int64(e.ReceivedBytes)
@@ -645,20 +658,19 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 						if err == nil {
 							downloadPath := filepath.Join(homeDir, "Downloads", files[idx].Filename)
 							targetPath := filepath.Join(destDir, files[idx].Filename)
-
-							// Check if file exists in Downloads
 							if _, err := os.Stat(downloadPath); err == nil {
-								if err := os.Rename(downloadPath, targetPath); err != nil {
-									fmt.Printf("\n⚠️  Failed to move file from %s to %s: %v\n", downloadPath, targetPath, err)
-								}
+								os.Rename(downloadPath, targetPath)
 							}
 						}
 
 						updateStatus(idx, files[idx])
 						if checkDone() {
+							logger.Info("🏁 All downloads tracked as complete. Waiting 30s for file finalization...")
+							time.Sleep(30 * time.Second)
 							return true
 						}
 					} else if e.State == proto.PageDownloadProgressStateCanceled {
+						// ... (Cancel logic)
 						mu.Lock()
 						files[idx].Status = "failed"
 						processedCount++
@@ -666,13 +678,25 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 						updateStatus(idx, files[idx])
 						if checkDone() {
+							logger.Info("🏁 Process finished (with some failures). Waiting 10s before closing...")
+							time.Sleep(10 * time.Second)
 							return true
 						}
 					} else {
 						// Active
 						mu.Lock()
+						prevBytes := files[idx].DownloadedBytes
 						files[idx].DownloadedBytes = int64(e.ReceivedBytes)
 						files[idx].SizeBytes = int64(e.TotalBytes)
+
+						// UPDATE ACTIVITY TIMESTAMP ONLY IF PROGRESS
+						if lastActivity != nil {
+							// Check if progress actually happened
+							if int64(e.ReceivedBytes) > prevBytes {
+								lastActivity[idx] = time.Now()
+							}
+						}
+
 						mu.Unlock()
 						updateStatus(idx, files[idx])
 					}
@@ -717,21 +741,55 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 			// Validate URL path and Query param (hl=en)
 			// If missing hl=en, we reload to ensure English text for error detection
 			if err != nil || !strings.Contains(currentURL, "takeout.google.com/manage/archive") || !strings.Contains(currentURL, "hl=en") {
-				logger.Debug("⚠️  Page context/lang lost (URL: %s). Navigating back to list with hl=en...", currentURL)
+				// CHECK FOR AUTH/LOGIN/PASSKEY
+				if strings.Contains(currentURL, "accounts.google.com") || strings.Contains(currentURL, "signin") {
+					logger.Info("🔐 Auth/Passkey challenge detected! Waiting for user interaction...")
+					logger.Info("👉 Please complete the authentication in the browser window.")
 
-				// Ensure target URL has hl=en
-				targetURL := url
-				if !strings.Contains(targetURL, "hl=en") {
-					if strings.Contains(targetURL, "?") {
-						targetURL += "&hl=en"
-					} else {
-						targetURL += "?hl=en"
+					// Wait up to 10 minutes for user to solve
+					authTimeout := time.After(10 * time.Minute)
+					ticker := time.NewTicker(5 * time.Second)
+					authResolved := false
+					for !authResolved {
+						select {
+						case <-authTimeout:
+							logger.Error("❌ Auth wait timed out.")
+							authResolved = true // Break loop, will likely fail next check
+						case <-ticker.C:
+							if info, err := page.Info(); err == nil {
+								if strings.Contains(info.URL, "takeout.google.com/manage/archive") {
+									logger.Info("✅ Auth resolved! Resuming...")
+									authResolved = true
+								}
+							}
+						}
+					}
+					ticker.Stop()
+					// Refresh current URL info after wait
+					currentInfo, _ = page.Info()
+					if currentInfo != nil {
+						currentURL = currentInfo.URL
 					}
 				}
 
-				page.MustNavigate(targetURL)
-				page.MustWaitLoad()
-				time.Sleep(5 * time.Second) // Stabilize
+				// If still not on correct page (or language lost), navigate back
+				if !strings.Contains(currentURL, "takeout.google.com/manage/archive") || !strings.Contains(currentURL, "hl=en") {
+					logger.Debug("⚠️  Page context/lang lost (URL: %s). Navigating back to list with hl=en...", currentURL)
+
+					// Ensure target URL has hl=en
+					targetURL := url
+					if !strings.Contains(targetURL, "hl=en") {
+						if strings.Contains(targetURL, "?") {
+							targetURL += "&hl=en"
+						} else {
+							targetURL += "?hl=en"
+						}
+					}
+
+					page.MustNavigate(targetURL)
+					page.MustWaitLoad()
+					time.Sleep(5 * time.Second) // Stabilize
+				}
 			}
 
 			logger.Debug("   ... Clicking button for part %d...", pNum)
@@ -878,42 +936,124 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 			}
 		}
 
-		// PHASE 2: REST OF FILES (Throttled)
-		// Start from index 1 (since 0 is done in warm-up)
-		startLoop := 1
-		if len(pendingIndices) <= 1 {
-			startLoop = len(pendingIndices) // nothing left
-		}
+		// PHASE 2: REST OF FILES (Retry Loop)
+		// We iterate until all files are done/failed, retrying pending ones that didn't start.
+		// Dynamic Throttling: Start with 2, add 1 every 550s, max 6.
+		startTime := time.Now()
+		pass := 0
 
-		maxConcurrent := 2 // Limit parallel downloads
-
-		for i := startLoop; i < len(pendingIndices); i++ {
-			fileIdx := pendingIndices[i]
-			partNum := files[fileIdx].PartNumber
-
-			// Throttle: Wait if too many active
-			for getActive() >= maxConcurrent {
-				logger.Debug("⏳ Max concurrent downloads (%d) reached. Waiting...", maxConcurrent)
-				time.Sleep(10 * time.Second)
+		for !checkDone() {
+			pass++
+			// Log retry passes only if we are stuck looping
+			if pass > 1 {
+				logger.Info("🔄 Retry Pass %d: Checking for pending/stuck downloads...", pass)
+				time.Sleep(5 * time.Second)
 			}
 
-			// Use the helper logic
-			success := clickFileWithCheck(fileIdx)
-
-			if success {
-				logger.Debug("✅ Click successful for part %d", partNum)
-				time.Sleep(15 * time.Second) // Slow down
-			} else {
-				logger.Debug("⚠️  Click failed (JS false or Quota detected) for part %d. Skipping.", partNum)
+			// Iterate ALL pending indices to retry files that haven't started yet
+			for _, fileIdx := range pendingIndices {
+				// Check Status
 				mu.Lock()
-				files[fileIdx].Status = "failed"
-				processedCount++
+				status := files[fileIdx].Status
+
+				// 🛡️ STALL DETECTION for active downloads
+				stallDetected := false
+				var stalledFile registry.DownloadFile
+
+				if status == "downloading" {
+					if lastTime, ok := lastActivity[fileIdx]; ok {
+						if time.Since(lastTime) > 5*time.Minute {
+							// It's stuck! Fail it so it can be revived.
+							logger.Error("❌ Download stalled for Part %d (No activity for 5m). Marking as failed.", files[fileIdx].PartNumber)
+							files[fileIdx].Status = "failed"
+							processedCount++ // Temp increment, will be decremented on revive
+							status = "failed"
+
+							stallDetected = true
+							stalledFile = files[fileIdx]
+						}
+					}
+				}
 				mu.Unlock()
-				updateStatus(fileIdx, files[fileIdx])
-				checkDone()
+
+				if stallDetected {
+					updateStatus(fileIdx, stalledFile)
+				}
+
+				// Skip if running, done, or failed
+				if status == "downloading" || status == "completed" || status == "failed" {
+					continue
+				}
+
+				// Throttle logic with Dynamic Ramp-Up
+				for {
+					active := getActive()
+
+					// Calculate allowed concurrent based on time
+					elapsed := time.Since(startTime).Seconds()
+					allowed := 2 + int(elapsed/550.0)
+					if allowed > 6 {
+						allowed = 6
+					}
+
+					if active < allowed {
+						break // Green light
+					}
+
+					logger.Debug("⏳ Max concurrent downloads (%d) reached. Waiting (Active: %d)...", allowed, active)
+					time.Sleep(10 * time.Second)
+				}
+
+				// Check again if done while waiting
+				if checkDone() {
+					break
+				}
+
+				partNum := files[fileIdx].PartNumber
+
+				// Attempt click
+				success := clickFileWithCheck(fileIdx)
+
+				if success {
+					logger.Debug("✅ Click fired for part %d. Waiting for download event...", partNum)
+					time.Sleep(15 * time.Second) // Slow down and wait for event
+				} else {
+					// Only mark as failed if explicit false (JS error/Quota)
+					// If Quota, ErrQuotaExceeded triggers main thread exit.
+					logger.Debug("⚠️  Click failed for part %d.", partNum)
+					mu.Lock()
+					files[fileIdx].Status = "failed"
+					processedCount++
+					mu.Unlock()
+					updateStatus(fileIdx, files[fileIdx])
+					checkDone()
+				}
 			}
+
+			// Safety Break: If we looped and no downloads are active and we aren't done,
+			// and we've tried multiple times, we might be stuck.
+			if getActive() == 0 && !checkDone() {
+				if pass > 3 {
+					logger.Error("❌ Unable to start remaining pending downloads after 3 passes. Aborting.")
+					// Force close to avoid hang
+					mu.Lock()
+					for _, idx := range pendingIndices {
+						if files[idx].Status == "" {
+							files[idx].Status = "failed"
+							processedCount++
+						}
+					}
+					mu.Unlock()
+					checkDone() // Trigger close
+					break
+				}
+			}
+
+			// Optional: Small sleep between passes
+			time.Sleep(2 * time.Second)
 		}
-		logger.Debug("✅ Download requests firing phase completed.")
+
+		logger.Debug("✅ Download requests loop completed.")
 
 		if checkDone() {
 			// Trigger a check just in case
@@ -952,10 +1092,18 @@ func (m *Manager) handleAuth(password string) {
 	}
 }
 
-// Deprecated: Use DownloadFiles
-func (m *Manager) DownloadExport(id string, destDir string) (int, string, error) {
-	// Wrapping new logic for compatibility if needed, else delete.
-	return 0, "", fmt.Errorf("use DownloadFiles instead")
+// FormatSize converts bytes to human readable string
+func FormatSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.2f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 // ParseSize parses human readable size string (e.g. "50 GB", "10.5 MB") into bytes
