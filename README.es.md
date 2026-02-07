@@ -57,16 +57,26 @@ La configuración se almacena en `~/.config/google-photos-backup/config.yaml`.
 | `backup_path` | `./backup` | Directorio principal donde se guardarán las copias. |
 | `backup_frequency` | `168h` | Frecuencia para solicitar nuevas copias (ej. `24h`, `168h` = 7 días). |
 | `download_mode` | `directDownload` | Modo de operación. Actualmente solo se soporta `directDownload`. |
+| `fix_ambiguous_metadata` | `interactive` | Comportamiento para coincidencias ambiguas (`yes`, `no`, `interactive`). |
 | `user_data_dir` | (auto) | Ruta al perfil de usuario de Chrome (no cambiar salvo necesario). |
 
-## Integridad de Datos
+## Ciclo de Vida de una Exportación
+
+El sistema gestiona el ciclo de vida de cada Takeout mediante estados en `history.json`:
+
+*   **`requested`**: Solicitud iniciada pero no confirmada por Google.
+*   **`in_progress`**: Google está preparando los archivos.
+*   **`ready`**: Archivos listos para descargar.
+*   **`expired`**: La exportación caducó en los servidores de Google.
+*   **`cancelled`**: Cancelada por el usuario o el sistema.
+*   **`failed`**: Google falló al generar la exportación.
+
+### Integridad de Datos
 
 Para asegurar la seguridad y evitar conflictos:
 1.  **`history.json`**: Fuente de la verdad de las exportaciones. Modificado por `sync`, solo lectura para `process`.
-2.  **`state.json`**: Ubicado en cada carpeta de descarga (ej. `downloads/ID_XXX/state.json`), rastrea el progreso de cada ZIP. Contiene:
-    *   `files`: Lista de archivos esperados.
-    *   *Restricción*: El comando `process` valida ESTRICTAMENTE que el estado sea "completed" y el tamaño coincida antes de extraer.
-3.  **`processing_index.json`**: Mantenido por `process`, rastrea qué exportaciones y archivos han sido procesados para evitar duplicados.
+2.  **`state.json`**: Rastrea el progreso de cada ZIP.
+3.  **`processing_index.json`**: Rastrea qué exportaciones y archivos han sido procesados.
 
 ## Uso
 
@@ -94,31 +104,26 @@ Una vez descargados los archivos, este comando extrae, corrige metadatos y organ
 **Flujo de Trabajo:**
 1.  **Extracción**: Descomprime nuevos archivos encontrados en `downloads/` a un subdirectorio `raw/`.
 2.  **Corrección de Metadatos**: Usa los ficheros JSON de Google para corregir la "Fecha de Modificación" de tus imágenes/videos.
-3.  **Deduplicación Global**: Escanea todos los ficheros, identifica duplicados (SHA256) y mantiene la mejor versión (priorizando nombres de álbum). Los duplicados se reemplazan con enlaces simbólicos relativos.
+    *   **Niveles de Coincidencia**:
+        *   **Nivel 1 (Exacto)**: Coincide `archivo.json` o `archivo.supplemental-metadata.json`.
+        *   **Nivel 2 (Limpio)**: Coincide eliminando extensión (ej. `IMG_123.jpg` -> `IMG_123.json`).
+        *   **Nivel 3 (Difuso/Seguro)**: Coincide nombres truncados si la longitud común es **>40 caracteres** (evita que `IMG.json` coincida con `IMG_1234.jpg`).
+    *   **Coincidencias Ambiguas**: Las coincidencias parciales menores de 40 caracteres usan el comportamiento definido por `--fix-ambiguous-metadata`.
+3.  **Deduplicación Global**: Escanea todos los ficheros, identifica duplicados (SHA256) y mantiene la mejor versión.
 
 **Flags:**
 
-*   `--force-metadata`: Re-ejecuta la corrección de fechas en exportaciones ya procesadas. Usa un escaneo "ligero" (rápido) sin recalcular hashes.
-*   `--force-dedup`: Re-ejecuta la comprobación de duplicados. Fuerza un escaneo SHA256 completo para asegurar la integridad del índice.
-*   `--force-extract`: Re-extrae los archivos comprimidos. Sobreescribe lo existente.
+*   `--fix-ambiguous-metadata`: Comportamiento para coincidencias ambiguas (`yes`=aplicar, `no`=saltar, `interactive`=preguntar). Por defecto: `interactive`.
+*   `--force-metadata`: Re-ejecuta la corrección de fechas en exportaciones ya procesadas.
+*   `--force-dedup`: Re-ejecuta la comprobación de duplicados.
+*   `--force-extract`: Re-extrae los archivos comprimidos.
 *   `--export <ID>`: Procesa SOLO el ID de exportación especificado.
-
-## Ciclo de Vida de una Exportación
-
-El sistema gestiona el ciclo de vida de cada Takeout mediante estados en `history.json`:
-
-*   **`requested`**: Solicitud iniciada pero no confirmada por Google.
-*   **`in_progress`**: Google está preparando los archivos.
-*   **`ready`**: Archivos listos para descargar.
-*   **`expired`**: La exportación caducó en los servidores de Google.
-*   **`cancelled`**: Cancelada por el usuario o el sistema.
-*   **`failed`**: Google falló al generar la exportación.
 
 ## Solución de Problemas
 
-*   **Problemas de Login:** Si la herramienta se queda atascada verificando la sesión, prueba a ejecutar `./gpb configure` de nuevo y asegúrate de completar el proceso en la ventana del navegador.
-*   **"Quota Exceeded":** Google limita el número de veces que puedes descargar un archivo (usualmente 5-10 veces). Si ocurre este error, la herramienta marcará la exportación como expirada y solicitará una nueva en la siguiente ejecución.
-*   **Modo Verbose:** Ejecuta con `./gpb sync -v` para ver exactamente qué está haciendo la automatización del navegador.
+*   **Problemas de Login:** Si la herramienta se queda atascada verificando la sesión, prueba a ejecutar `./gpb configure` de nuevo.
+*   **"Quota Exceeded":** Si ocurre este error, la herramienta marcará la exportación como expirada y solicitará una nueva.
+*   **Modo Verbose:** Ejecuta con `./gpb sync -v`.
 
 ## Créditos
 

@@ -57,6 +57,7 @@ The config is stored at `~/.config/google-photos-backup/config.yaml`.
 | `backup_path` | `./backup` | Main directory where backups will be stored. |
 | `backup_frequency` | `168h` | How often to request a new backup (e.g., `24h`, `168h` = 7 days). |
 | `download_mode` | `directDownload` | Mode of operation. Currently only `directDownload` is supported. |
+| `fix_ambiguous_metadata` | `interactive` | Default behavior for ambiguous matches (`yes`, `no`, `interactive`). |
 | `user_data_dir` | (auto) | Path to Chrome user profile data (do not change unless necessary). |
 
 ## Export Status Lifecycle
@@ -106,14 +107,20 @@ After `sync` downloads the files, this command extracts, fixes metadata, and org
 **Workflow:**
 1.  **Extraction**: Unzips new archives found in `downloads/` to a `raw/` subdirectory.
 2.  **Metadata Correction**: Uses Google's JSON sidecar files to fix the "Date Modified" of your images/videos.
+    *   **Matching Levels**:
+        *   **Level 1 (Exact)**: Matches `file.json` or `file.supplemental-metadata.json`.
+        *   **Level 2 (Clean)**: Matches filenames by stripping extensions (e.g., `IMG_123.jpg` -> `IMG_123.json`).
+        *   **Level 3 (Fuzzy/Secure)**: Matches truncated filenames if the match length is **>40 characters** (prevents `IMG.json` from matching `IMG_1234.jpg`).
+    *   **Ambiguous Matches**: Partial matches shorter than 40 chars use the behavior defined by `--fix-ambiguous-metadata`.
 3.  **Global Deduplication**: Scans all processed files, identifies duplicates (SHA256), and keeps the best version (prioritizing album names). Duplicates are replaced with relative symlinks to save space.
 
 **Flags:**
 
-*   `--force-metadata`: Re-runs date correction on already processed exports. Uses a "light" scan (fast) without re-hashing files.
+*   `--fix-ambiguous-metadata`: Behavior for ambiguous metadata matches (`yes`=apply, `no`=skip, `interactive`=ask). Default: `interactive`.
+*   `--force-metadata`: Re-runs date correction on already processed exports.
 *   `--force-dedup`: Re-runs the duplicate check. Forces a full SHA256 scan of existing files to ensure index integrity.
 *   `--force-extract`: Re-extracts archives. Overwrites existing files.
-*   `--export <ID>`: Runs processing ONLY on the specified Export UUID.
+*   `--export <ID>`: Runs processing ONLY on the specified Export ID.
 
 ### How it Works
 

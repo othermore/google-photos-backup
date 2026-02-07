@@ -45,6 +45,10 @@ var messages = map[string]map[string]string{
 		"en": "Error saving configuration: %s",
 		"es": "Error guardando configuración: %s",
 	},
+	"prompt_fix_ambiguous": {
+		"en": "Behavior for ambiguous metadata matches (yes/no/interactive) [default: %s]",
+		"es": "Comportamiento para coincidencias de metadatos ambiguas (yes/no/interactive) [por defecto: %s]",
+	},
 	"login_ask": {
 		"en": "\nDo you want to log in to Google now to validate access? (y/n)",
 		"es": "\n¿Deseas iniciar sesión en Google ahora para validar el acceso? (s/n)",

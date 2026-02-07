@@ -60,11 +60,16 @@ var processCmd = &cobra.Command{
 		pm.ForceExtraction, _ = cmd.Flags().GetBool("force-extract")
 		pm.ForceDedup, _ = cmd.Flags().GetBool("force-dedup")
 		pm.TargetExport, _ = cmd.Flags().GetString("export")
-		pm.TargetExport, _ = cmd.Flags().GetString("export")
 
-		// Legacy alias: if user types --force (if we kept it? no we removed it, but let's be safe)
-		// Actually I removed the definition of "force" flag above, so I cannot get it here.
-		// Wait, I am editing the file content, so I must match the existing exactly.
+		// Handle --fix-ambiguous-metadata
+		// Priority: Flag > Config > Default
+		flagAmbiguous, _ := cmd.Flags().GetString("fix-ambiguous-metadata")
+		if flagAmbiguous != "" {
+			pm.FixAmbiguousMetadata = flagAmbiguous
+		} else {
+			// Get from viper (config or default)
+			pm.FixAmbiguousMetadata = viper.GetString("fix_ambiguous_metadata")
+		}
 
 		if err := pm.Run(); err != nil {
 			logger.Error("❌ Processing failed: %v", err)
@@ -87,4 +92,6 @@ func init() {
 	processCmd.Flags().Bool("force-extract", false, "Force extraction for already processed exports")
 	processCmd.Flags().Bool("force-dedup", false, "Force global deduplication check")
 	processCmd.Flags().String("export", "", "Process only this specific Export ID")
+
+	processCmd.Flags().String("fix-ambiguous-metadata", "", "Behavior for ambiguous metadata matches: yes, no, or interactive")
 }

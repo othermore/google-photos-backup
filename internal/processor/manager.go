@@ -14,14 +14,15 @@ import (
 )
 
 type Manager struct {
-	InputDir        string
-	OutputDir       string
-	AlbumsDir       string
-	DeleteOrigin    bool
-	TargetExport    string // If set, process only this Export ID
-	ForceMetadata   bool   // Force metadata correction even if export is done
-	ForceExtraction bool   // Force extraction even if export is done
-	ForceDedup      bool   // Force global deduplication check
+	InputDir             string
+	OutputDir            string
+	AlbumsDir            string
+	DeleteOrigin         bool
+	TargetExport         string // If set, process only this Export ID
+	ForceMetadata        bool   // Force metadata correction even if export is done
+	ForceExtraction      bool   // Force extraction even if export is done
+	ForceDedup           bool   // Force global deduplication check
+	FixAmbiguousMetadata string // "yes", "no", "interactive"
 
 	// Index: Key = Absolute Path, Value = Metadata
 	FileIndex map[string]FileMetadata

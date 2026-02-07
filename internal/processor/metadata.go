@@ -34,37 +34,143 @@ var (
 	reNumbering = regexp.MustCompile(`\(\d+\)$`)
 )
 
+// MinTruncationLength defines the minimum length to consider a filename for truncation matching
+const MinTruncationLength = 40
+
 // CorrectMetadata iterates over all media files and applies dates from JSON
 func (m *Manager) CorrectMetadata() error {
-	// 1. Build Index of JSONs
+	// 1. Build Index of JSONs and group by Directory for faster access
 	// We store valid JSON paths in a map keyed by their "clean" name
 	// but we also keep the raw filename for fuzzy matching.
-	jsonFiles := make([]string, 0)
+	jsonFiles := make(map[string]bool)
+	jsonByDir := make(map[string][]string)
 
 	for path, meta := range m.FileIndex {
 		if meta.IsJSON {
-			jsonFiles = append(jsonFiles, path)
+			jsonFiles[path] = true
+			dir := filepath.Dir(path)
+			jsonByDir[dir] = append(jsonByDir[dir], filepath.Base(path))
 		}
 	}
 
 	logger.Info("   Indexed %d JSON sidecars.", len(jsonFiles))
 
 	updated := 0
-	// 2. Match Media Files
+	ambiguousMatches := make(map[string][]string) // json -> [images...]
+	secureMatches := make(map[string]string)      // image -> json
+
+	// 2. Match Media Files - Pass 1: Secure Matches & Ambiguous Collection
 	for mediaPath, meta := range m.FileIndex {
 		if meta.IsJSON {
 			continue
 		}
 
-		bestJSON := m.findBestJSON(mediaPath, jsonFiles)
+		bestJSON, isAmbiguous, ambiguousCandidate := m.findBestJSON(mediaPath, jsonFiles, jsonByDir)
 		if bestJSON != "" {
-			if err := m.applyDate(mediaPath, bestJSON); err == nil {
-				updated++
-			} else {
-				logger.Debug("❌ Failed to apply date to %s: %v", filepath.Base(mediaPath), err)
-			}
+			secureMatches[mediaPath] = bestJSON
+		} else if isAmbiguous {
+			// Collect ambiguous matches for later user confirmation
+			list := ambiguousMatches[ambiguousCandidate]
+			list = append(list, mediaPath)
+			ambiguousMatches[ambiguousCandidate] = list
+		}
+	}
+
+	// Apply Secure Matches
+	for mediaPath, jsonPath := range secureMatches {
+		if err := m.applyDate(mediaPath, jsonPath); err == nil {
+			updated++
 		} else {
-			logger.Info("⚠️  No JSON found for: %s", filepath.Base(mediaPath))
+			logger.Debug("❌ Failed to apply date to %s: %v", filepath.Base(mediaPath), err)
+		}
+	}
+
+	// 3. Handle Ambiguous Matches
+	if len(ambiguousMatches) > 0 {
+		secureCount := len(secureMatches)
+		ambiguousCount := 0
+		for _, imgs := range ambiguousMatches {
+			ambiguousCount += len(imgs)
+		}
+
+		fixMode := strings.ToLower(m.FixAmbiguousMetadata)
+		if fixMode == "" {
+			fixMode = "interactive"
+		}
+
+		shouldApply := false
+
+		// Logic:
+		// IF yes -> apply automatically (log summary briefly)
+		// IF no -> show full summary, do not prompt, do not apply
+		// IF interactive -> show full summary, prompt, apply if user says yes
+
+		if fixMode == "yes" {
+			logger.Info("✅ Automatically applying %d ambiguous matches (fix-ambiguous-metadata=yes).", ambiguousCount)
+			shouldApply = true
+		} else {
+			// Show Full Summary (Interactive or No)
+
+			// Internationalized Messages
+			msgEn := fmt.Sprintf("\n⚠️  Found %d secure matches. For %d other files, a secure JSON could not be identified, but %d of them have a POSSIBLE match if we ignore filename length safety checks.", secureCount, len(m.FileIndex)-len(jsonFiles)-secureCount, ambiguousCount)
+			msgEs := fmt.Sprintf("\n⚠️  Se encontraron %d coincidencias seguras. Para otros %d archivos no se pudo identificar un JSON seguro, pero %d de ellos tienen una coincidencia POSIBLE si ignoramos las comprobaciones de seguridad de longitud de nombre.", secureCount, len(m.FileIndex)-len(jsonFiles)-secureCount, ambiguousCount)
+
+			fmt.Println(msgEn)
+			fmt.Println(msgEs)
+			fmt.Println("---------------------------------------------------")
+
+			// Show examples (up to 15)
+			count := 0
+			sortedJSONs := make([]string, 0, len(ambiguousMatches))
+			for k := range ambiguousMatches {
+				sortedJSONs = append(sortedJSONs, k)
+			}
+
+			for _, jsonPath := range sortedJSONs {
+				images := ambiguousMatches[jsonPath]
+				for _, img := range images {
+					if count >= 15 {
+						break
+					}
+					fmt.Printf("   📸 %s -> 📄 %s\n", filepath.Base(img), filepath.Base(jsonPath))
+					count++
+				}
+				if count >= 15 {
+					break
+				}
+			}
+			if ambiguousCount > 15 {
+				fmt.Printf("   ... and %d more / y %d más ...\n", ambiguousCount-15, ambiguousCount-15)
+			}
+
+			if fixMode == "interactive" {
+				// Prompt user
+				fmt.Println("\n❓ Apply these insecure matches? / ¿Aplicar estas coincidencias inseguras? (y/n): ")
+				var response string
+				fmt.Scanln(&response)
+
+				if strings.ToLower(response) == "y" || strings.ToLower(response) == "s" {
+					shouldApply = true
+				} else {
+					fmt.Println("Skipping insecure matches. / Saltando coincidencias inseguras.")
+				}
+			} else {
+				// Mode "no"
+				fmt.Println("\nSkipping insecure matches (fix-ambiguous-metadata=no). / Saltando coincidencias inseguras.")
+			}
+		}
+
+		if shouldApply {
+			if fixMode == "interactive" {
+				fmt.Println("Applying insecure matches... / Aplicando coincidencias inseguras...")
+			}
+			for jsonPath, images := range ambiguousMatches {
+				for _, img := range images {
+					if err := m.applyDate(img, jsonPath); err == nil {
+						updated++
+					}
+				}
+			}
 		}
 	}
 
@@ -73,34 +179,28 @@ func (m *Manager) CorrectMetadata() error {
 }
 
 // findBestJSON implements the heuristics to find the matching JSON file
-func (m *Manager) findBestJSON(mediaPath string, jsonFiles []string) string {
+func (m *Manager) findBestJSON(mediaPath string, allJsonFiles map[string]bool, jsonByDir map[string][]string) (string, bool, string) {
 	mediaName := filepath.Base(mediaPath)
 	dir := filepath.Dir(mediaPath)
 
 	// --- Level 1: Direct Exact Matches ---
 	// 1. "file.jpg" -> "file.jpg.json"
 	c1 := mediaPath + ".json"
-	if _, ok := m.FileIndex[c1]; ok {
-		return c1
+	if allJsonFiles[c1] {
+		return c1, false, ""
 	}
 	// 2. "file.jpg" -> "file.jpg.supplemental-metadata.json"
 	c2 := mediaPath + ".supplemental-metadata.json"
-	if _, ok := m.FileIndex[c2]; ok {
-		return c2
+	if allJsonFiles[c2] {
+		return c2, false, ""
 	}
 
 	// --- Level 2: Clean Name Matches (Strip Extension & Suffixes) ---
-	// Normalize the media name to find its "Root"
-	// Example: "DSC00189-edited.JPG" -> "DSC00189"
-	// Example: "_DSC0188(2).JPG" -> "_DSC0188"
-
 	ext := filepath.Ext(mediaName)
 	withoutExt := strings.TrimSuffix(mediaName, ext)
-
 	cleanName := withoutExt
 
 	// Strip "Numbering" suffixes: "file(1)" -> "file"
-	// Note: We only strip (N) if it's at the very end
 	if loc := reNumbering.FindStringIndex(cleanName); loc != nil {
 		cleanName = cleanName[:loc[0]]
 	}
@@ -110,12 +210,10 @@ func (m *Manager) findBestJSON(mediaPath string, jsonFiles []string) string {
 		cleanName = cleanName[:loc[0]]
 	}
 
-	// Candidate List based on CleanName
-	// We verify presence using the Index
 	candidates := []string{
 		cleanName + ".json",       // "DSC00189.json"
-		cleanName + ext + ".json", // "DSC00189.JPG.json" (Re-add ext to clean root)
-		cleanName + ".jpg.json",   // "MVC...jpg.json" (for .mp4)
+		cleanName + ext + ".json", // "DSC00189.JPG.json"
+		cleanName + ".jpg.json",
 		cleanName + ".JPG.json",
 		cleanName + ".jpeg.json",
 		cleanName + ".heic.json",
@@ -125,25 +223,13 @@ func (m *Manager) findBestJSON(mediaPath string, jsonFiles []string) string {
 
 	for _, candName := range candidates {
 		fullPath := filepath.Join(dir, candName)
-		if _, ok := m.FileIndex[fullPath]; ok {
-			return fullPath
+		if allJsonFiles[fullPath] {
+			return fullPath, false, ""
 		}
 	}
 
 	// --- Level 3: Directory Scan (Fuzzy & Truncation) ---
-	// Only iterate files in the same directory (optimization)
-
-	// Optimization: Filter JSONs in the same directory if not cached
-	// To avoid re-iterating m.FileIndex every time, we rely on the caller passing 'jsonFiles'
-	// BUT jsonFiles contains ALL json files. We should filter by directory.
-
-	dirJSONs := []string{}
-	// Filter jsonFiles by Directory
-	for _, jPath := range jsonFiles {
-		if filepath.Dir(jPath) == dir {
-			dirJSONs = append(dirJSONs, filepath.Base(jPath))
-		}
-	}
+	dirJSONs := jsonByDir[dir]
 
 	for _, jsonName := range dirJSONs {
 		// Prepare JSON stems
@@ -151,38 +237,27 @@ func (m *Manager) findBestJSON(mediaPath string, jsonFiles []string) string {
 		jStem = strings.TrimSuffix(jStem, ".json")
 		jStem = strings.TrimSuffix(jStem, ".supplemental-metadata")
 		jStem = strings.TrimSuffix(jStem, ".metadata")
-		// jStem could be "DSC00189.JPG" or "DSC00189"
 
-		// 1. Prefix Match (Truncation)
-		// Check if MediaName starts with JSON stem (Reverse of usual, because MediaName is long)
-		// AND Check if CleanMediaName starts with JSON stem
-		// OR Check if JSON stem starts with CleanMediaName (if JSON has extra junk?)
+		fullJsonPath := filepath.Join(dir, jsonName)
 
-		// Case: "00100..._BURST..._CO.jpg" vs "00100..._BURST..._C.json"
-		// jStem="00100..._C", Media="00100..._CO.jpg"
-		// Media starts with jStem? Yes.
+		// Case A: JSON is shorter prefix of Media (Truncation)
 		if strings.HasPrefix(withoutExt, jStem) {
-			return filepath.Join(dir, jsonName)
+			if len(jStem) >= MinTruncationLength {
+				return fullJsonPath, false, "" // Secure Match
+			}
+			return "", true, fullJsonPath // Ambiguous Match
 		}
 
-		// Case: "PXL...ORIGINAL-edi.jpg" vs "PXL...ORIGINAL.jp.json"
-		// CleanMedia="PXL...ORIGINAL"
-		// jStem="PXL...ORIGINAL.jp"
-		// Match? No. CleanMedia doesn't start with jStem.
-		// Does jStem start with CleanMedia? Yes. "PXL...ORIGINAL.jp" starts with "PXL...ORIGINAL"
+		// Case B: Media is shorter prefix of JSON
 		if strings.HasPrefix(jStem, cleanName) {
-			return filepath.Join(dir, jsonName)
+			if len(cleanName) >= MinTruncationLength {
+				return fullJsonPath, false, "" // Secure Match
+			}
+			return "", true, fullJsonPath // Ambiguous Match
 		}
-
-		// Case: "MVIMG...MP4" vs "MVIMG...jpg.json"
-		// CleanMedia="MVIMG..."
-		// jStem="MVIMG...jpg"
-		// jStem starts with CleanMedia? Yes.
-
-		// This should cover most cases.
 	}
 
-	return ""
+	return "", false, ""
 }
 
 func isMediaExt(ext string) bool {

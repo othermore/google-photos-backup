@@ -47,9 +47,36 @@ var configureCmd = &cobra.Command{
 			dlMode = config.ModeDirectDownload
 		}
 
-		// 3. Guardar
+		// 3. Fix Ambiguous Metadata
+		currentFix := config.AppConfig.FixAmbiguousMetadata
+		if currentFix == "" {
+			currentFix = "interactive"
+		}
+		// We'll use a direct string here if translation key is missing, or update i18n later
+		// But let's assume we will adding "prompt_fix_ambiguous" key.
+		// For now I'll use a hardcoded fallback in English logical flow or wait for i18n update.
+		// Actually, I should use the key and ensure it exists.
+
+		fixPrompt := fmt.Sprintf("Behavior for ambiguous metadata matches (yes/no/interactive) [default: %s]", currentFix)
+		// Try to use i18n if possible, but I don't have the key yet.
+		// I'll stick to English here for the prompt structure or rely on i18n.T returns key if missing?
+		// Let's us a simple string for now to avoid compilation error if T doesn't exist? No T exists.
+		// I will use i18n.T("prompt_fix_ambiguous") and then update the i18n map.
+
+		// Actually, the previous code used Sprintf with T. Let's do that.
+		// fixPrompt := fmt.Sprintf(i18n.T("prompt_fix_ambiguous"), currentFix)
+		// But I haven't added the key yet. I will add it in next steps.
+
+		fixMode := prompt(fixPrompt, currentFix)
+		validFixes := map[string]bool{"yes": true, "no": true, "interactive": true}
+		if !validFixes[fixMode] {
+			fixMode = "interactive"
+		}
+
+		// 4. Guardar
 		viper.Set("backup_path", absPath)
 		viper.Set("download_mode", dlMode)
+		viper.Set("fix_ambiguous_metadata", fixMode)
 
 		if viper.ConfigFileUsed() == "" {
 			home, _ := os.UserHomeDir()

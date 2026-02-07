@@ -12,14 +12,15 @@ import (
 )
 
 type Config struct {
-	UserID          string        `mapstructure:"user_id"`
-	BackupPath      string        `mapstructure:"backup_path"`
-	IndexPath       string        `mapstructure:"index_path"`
-	ClientID        string        `mapstructure:"client_id"`
-	ClientSecret    string        `mapstructure:"client_secret"`
-	TokenPath       string        `mapstructure:"token_path"`
-	BackupFrequency time.Duration `mapstructure:"backup_frequency"`
-	DownloadMode    string        `mapstructure:"download_mode"` // "directDownload" or "driveDownload"
+	UserID               string        `mapstructure:"user_id"`
+	BackupPath           string        `mapstructure:"backup_path"`
+	IndexPath            string        `mapstructure:"index_path"`
+	ClientID             string        `mapstructure:"client_id"`
+	ClientSecret         string        `mapstructure:"client_secret"`
+	TokenPath            string        `mapstructure:"token_path"`
+	BackupFrequency      time.Duration `mapstructure:"backup_frequency"`
+	DownloadMode         string        `mapstructure:"download_mode"`          // "directDownload" or "driveDownload"
+	FixAmbiguousMetadata string        `mapstructure:"fix_ambiguous_metadata"` // "yes", "no", "interactive"
 }
 
 const (
@@ -49,6 +50,7 @@ func InitConfig() {
 	viper.SetDefault("index_path", "./index.jsonl")
 	viper.SetDefault("backup_frequency", "168h") // 7 días (24*7)
 	viper.SetDefault("download_mode", ModeDirectDownload)
+	viper.SetDefault("fix_ambiguous_metadata", "interactive")
 
 	// Definimos ruta por defecto para el token dentro del directorio de config
 	if home, err := os.UserHomeDir(); err == nil {
