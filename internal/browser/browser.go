@@ -575,9 +575,28 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 	// 4. Setup Global Listener (Browser Level)
 	guidMap := make(map[string]int)
-	processedCount := 0 // successes + failures
+	startedFiles := make(map[int]bool) // Track files started by this session
+	processedCount := 0                // successes + failures
 	totalToDownload := len(pendingIndices)
 	allProcessedChan := make(chan struct{}, 1)
+
+	// Ensure cleanup on exit (normal or abrupt)
+	defer func() {
+		mu.Lock()
+		defer mu.Unlock()
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return
+		}
+		for idx := range startedFiles {
+			// If file is not completed, we consider it "broken" or "interrupted"
+			if files[idx].Status != "completed" {
+				logger.Info("🧹 Cleaning up incomplete download: %s", files[idx].Filename)
+				crPath := filepath.Join(homeDir, "Downloads", files[idx].Filename+".crdownload")
+				os.Remove(crPath)
+			}
+		}
+	}()
 
 	checkDone := func() bool {
 		mu.Lock()
@@ -622,6 +641,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 				if idx != -1 {
 					mu.Lock()
 					guidMap[e.GUID] = idx
+					startedFiles[idx] = true // Mark as started by us
 					files[idx].Filename = e.SuggestedFilename
 					files[idx].Status = "downloading"
 					files[idx].URL = e.URL
@@ -675,6 +695,13 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 						files[idx].Status = "failed"
 						processedCount++
 						mu.Unlock()
+
+						// Cleanup CRDOWNLOAD immediately
+						homeDir, err := os.UserHomeDir()
+						if err == nil {
+							crPath := filepath.Join(homeDir, "Downloads", files[idx].Filename+".crdownload")
+							os.Remove(crPath)
+						}
 
 						updateStatus(idx, files[idx])
 						if checkDone() {
@@ -962,12 +989,19 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 				if status == "downloading" {
 					if lastTime, ok := lastActivity[fileIdx]; ok {
-						if time.Since(lastTime) > 5*time.Minute {
+						if time.Since(lastTime) > 2*time.Minute {
 							// It's stuck! Fail it so it can be revived.
-							logger.Error("❌ Download stalled for Part %d (No activity for 5m). Marking as failed.", files[fileIdx].PartNumber)
+							logger.Error("❌ Download stalled for Part %d (No activity for 2m). Marking as failed.", files[fileIdx].PartNumber)
 							files[fileIdx].Status = "failed"
 							processedCount++ // Temp increment, will be decremented on revive
 							status = "failed"
+
+							// Cleanup CRDOWNLOAD
+							homeDir, err := os.UserHomeDir()
+							if err == nil {
+								crPath := filepath.Join(homeDir, "Downloads", files[fileIdx].Filename+".crdownload")
+								os.Remove(crPath)
+							}
 
 							stallDetected = true
 							stalledFile = files[fileIdx]
@@ -991,9 +1025,9 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 					// Calculate allowed concurrent based on time
 					elapsed := time.Since(startTime).Seconds()
-					allowed := 2 + int(elapsed/550.0)
-					if allowed > 6 {
-						allowed = 6
+					allowed := 1 + int(elapsed/550.0)
+					if allowed > 5 {
+						allowed = 5
 					}
 
 					if active < allowed {
