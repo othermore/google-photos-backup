@@ -58,6 +58,7 @@ La configuración se almacena en `~/.config/google-photos-backup/config.yaml`.
 | `backup_frequency` | `168h` | Frecuencia para solicitar nuevas copias (ej. `24h`, `168h` = 7 días). |
 | `download_mode` | `directDownload` | Modo de operación. Actualmente solo se soporta `directDownload`. |
 | `fix_ambiguous_metadata` | `interactive` | Comportamiento para coincidencias ambiguas (`yes`, `no`, `interactive`). |
+| `final_backup_path` | (vacío) | Ruta al destino final de la copia de seguridad. |
 | `user_data_dir` | (auto) | Ruta al perfil de usuario de Chrome (no cambiar salvo necesario). |
 
 ## Ciclo de Vida de una Exportación
@@ -118,6 +119,23 @@ Una vez descargados los archivos, este comando extrae, corrige metadatos y organ
 *   `--force-dedup`: Re-ejecuta la comprobación de duplicados.
 *   `--force-extract`: Re-extrae los archivos comprimidos.
 *   `--export <ID>`: Procesa SOLO el ID de exportación especificado.
+
+### 3. Actualizar Backup (Sincronización Final)
+
+Tras procesar, este comando sincroniza los archivos organizados con tu ubicación de almacenamiento final (ej. NAS, disco externo).
+
+```bash
+./gpb update-backup [flags]
+```
+
+**Características:**
+*   **Solo Aditivo:** Copia archivos nuevos al destino. Los existentes se saltan (nunca se sobrescriben ni borran).
+*   **Registro (Log):** Guarda detalles exactos de cada operación en `backup_log.jsonl` en el directorio final (fecha, lista de archivos, tamaño).
+*   **Limpieza:** Si finaliza con éxito, borra los archivos procesados originales para liberar espacio.
+
+**Flags:**
+*   `--dry-run`: Simula la actualización sin copiar ni borrar nada.
+*   `--source <dir>`: Especifica manualmente el directorio origen (por defecto usa la salida del procesado).
 
 ## Solución de Problemas
 

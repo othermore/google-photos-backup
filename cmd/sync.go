@@ -146,7 +146,7 @@ func (pt *ProgressTracker) Render() {
 			statusText = i18n.T("status_downloading")
 			if fPercent > 99.9 && f.SizeBytes > 0 {
 				statusIcon = "💿"
-				statusText = "Finalizando"
+				statusText = i18n.T("status_finalizing")
 			}
 		}
 
@@ -204,7 +204,7 @@ var syncCmd = &cobra.Command{
 		regPath := filepath.Join(config.AppConfig.BackupPath, "history.json")
 		reg, err := registry.New(regPath)
 		if err != nil {
-			fmt.Printf("⚠️  No se pudo cargar el historial: %v\n", err)
+			fmt.Printf(i18n.T("sync_history_error")+"\n", err)
 		}
 
 		// CLEANUP: Remove ghost/stale entries (ID="") from previous failed runs
@@ -216,7 +216,7 @@ var syncCmd = &cobra.Command{
 			}
 		}
 		if len(validExports) < len(reg.Exports) {
-			logger.Info("🧹 Removed %d incomplete/ghost entries from history.", len(reg.Exports)-len(validExports))
+			logger.Info(i18n.T("sync_ghost_removed"), len(reg.Exports)-len(validExports))
 			reg.Exports = validExports
 			reg.Save()
 		}
@@ -372,7 +372,7 @@ var syncCmd = &cobra.Command{
 						LastUpdated: time.Now(),
 					}
 					if err := state.Save(statePath); err != nil {
-						fmt.Printf("❌ Failed to migrate state: %v\n", err)
+						fmt.Printf(i18n.T("sync_migrate_fail")+"\n", err)
 					} else {
 						entry.Files = nil // Clear from registry
 						reg.Update(*entry)
@@ -393,7 +393,7 @@ var syncCmd = &cobra.Command{
 						// Check local file
 						if info, err := os.Stat(targetFile); err == nil {
 							if info.Size() >= f.SizeBytes {
-								logger.Info("✅ Found completed file: %s (Size: %s)", f.Filename, browser.FormatSize(info.Size()))
+								logger.Info(i18n.T("sync_found_completed"), f.Filename, browser.FormatSize(info.Size()))
 								filesToDownload[i].Status = "completed"
 								filesToDownload[i].DownloadedBytes = info.Size()
 								// If we found it valid, ensure we don't try to download it again
@@ -450,7 +450,7 @@ var syncCmd = &cobra.Command{
 			if !nonInteractive {
 				tracker.Render() // Initial render
 			} else {
-				logger.Info("📦 Export Set Detected: %d files, Total: %s", len(filesToDownload), entry.TotalSize)
+				logger.Info(i18n.T("sync_export_set"), len(filesToDownload), entry.TotalSize)
 			}
 
 			err = bm.DownloadFiles(completedStatus.ID, filesToDownload, downloadDir, func(idx int, updatedFile registry.DownloadFile) {
@@ -460,10 +460,10 @@ var syncCmd = &cobra.Command{
 
 				if nonInteractive {
 					if oldStatus != "downloading" && newStatus == "downloading" {
-						logger.Info("⬇️  Starting: %s (%s)", updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
+						logger.Info(i18n.T("sync_download_start"), updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
 					}
 					if oldStatus != "completed" && newStatus == "completed" {
-						logger.Info("✅ Finished: %s (%s)", updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
+						logger.Info(i18n.T("sync_download_finish"), updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
 					}
 				}
 
@@ -488,14 +488,14 @@ var syncCmd = &cobra.Command{
 
 			if err != nil {
 				if err == browser.ErrQuotaExceeded {
-					fmt.Println("⛔ Limite de descargas excedido (Quota Exceeded).")
-					fmt.Println("⚠️  Marcando exportación como EXPIRADA y limpiando datos parciales.")
+					fmt.Println(i18n.T("sync_quota_exceeded"))
+					fmt.Println(i18n.T("sync_quota_action"))
 
 					// CLEANUP: Wipe the directory to save space and remove bad state
 					if err := os.RemoveAll(downloadDir); err != nil {
-						fmt.Printf("❌ Error eliminando directorio de descarga: %v\n", err)
+						fmt.Printf(i18n.T("sync_cleanup_error")+"\n", err)
 					} else {
-						fmt.Println("🧹 Directorio de descarga eliminado.")
+						fmt.Println(i18n.T("sync_cleanup_success"))
 					}
 
 					entry.Status = registry.StatusExpired
@@ -570,7 +570,7 @@ var syncCmd = &cobra.Command{
 		}
 
 		if newID != "" {
-			logger.Info("✅ New export created with ID: %s", newID)
+			logger.Info(i18n.T("sync_new_export"), newID)
 			reg.Add(registry.ExportEntry{
 				ID:          newID,
 				RequestedAt: time.Now(),
@@ -582,7 +582,7 @@ var syncCmd = &cobra.Command{
 			// Ideally we shouldn't do this if we want to avoid ghosts,
 			// but we need to record that we tried.
 			// With the cleanup logic at start, this is safe-ish.
-			logger.Info("⚠️  Export created but ID not yet visible. Saving as pending.")
+			logger.Info(i18n.T("sync_pending_export"))
 			reg.Add(registry.ExportEntry{
 				RequestedAt: time.Now(),
 				Status:      registry.StatusRequested,

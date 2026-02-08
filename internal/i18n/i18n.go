@@ -49,6 +49,10 @@ var messages = map[string]map[string]string{
 		"en": "Behavior for ambiguous metadata matches (yes/no/interactive) [default: %s]",
 		"es": "Comportamiento para coincidencias de metadatos ambiguas (yes/no/interactive) [por defecto: %s]",
 	},
+	"prompt_download_mode": {
+		"en": "Select download mode (%s/%s) [default: %s]",
+		"es": "Selecciona el modo de descarga (%s/%s) [por defecto: %s]",
+	},
 	"login_ask": {
 		"en": "\nDo you want to log in to Google now to validate access? (y/n)",
 		"es": "\n¿Deseas iniciar sesión en Google ahora para validar el acceso? (s/n)",
@@ -344,6 +348,238 @@ var messages = map[string]map[string]string{
 	"list_saved": {
 		"en": "✅ List saved: %d files.",
 		"es": "✅ Lista guardada: %d ficheros.",
+	},
+	"prompt_final_backup": {
+		"en": "Final backup storage location (e.g. /nas/photos)",
+		"es": "Ubicación final del backup (ej. /nas/fotos)",
+	},
+	"update_backup_start": {
+		"en": "🔄 Starting backup update...",
+		"es": "🔄 Iniciando actualización del backup...",
+	},
+	"update_backup_success": {
+		"en": "\n✅ Backup successfully updated!\n   - Added: %d files (%s)\n   - Skipped: %d files\n   - Source processed: %s",
+		"es": "\n✅ Backup actualizado correctamente!\n   - Añadidos: %d archivos (%s)\n   - Saltados: %d archivos\n   - Origen procesado: %s",
+	},
+	"update_backup_no_config": {
+		"en": "❌ 'final_backup_path' is not configured. Run 'configure' first.",
+		"es": "❌ 'final_backup_path' no está configurado. Ejecuta 'configure' primero.",
+	},
+	"process_start": {
+		"en": "🚀 Starting Processing Phase",
+		"es": "🚀 Iniciando Fase de Procesamiento",
+	},
+	"process_input": {
+		"en": "📂 Input: %s",
+		"es": "📂 Entrada: %s",
+	},
+	"process_output": {
+		"en": "📂 Output: %s",
+		"es": "📂 Salida: %s",
+	},
+	"process_albums": {
+		"en": "📂 Albums: %s",
+		"es": "📂 Álbumes: %s",
+	},
+	"process_fail": {
+		"en": "❌ Processing failed: %v",
+		"es": "❌ Procesamiento fallido: %v",
+	},
+	"process_success": {
+		"en": "✅ Processing completed successfully.",
+		"es": "✅ Procesamiento completado con éxito.",
+	},
+	"update_backup_source": {
+		"en": "📂 Source Root: %s",
+		"es": "📂 Origen (Root): %s",
+	},
+	"update_backup_source_missing": {
+		"en": "❌ Source directory does not exist: %s",
+		"es": "❌ El directorio de origen no existe: %s",
+	},
+	"update_backup_dest": {
+		"en": "📂 Destination (Snapshot): %s",
+		"es": "📂 Destino (Snapshot): %s",
+	},
+	"update_backup_dry_run": {
+		"en": "⚠️ DRY RUN MODE: No files will be copied, linked, or deleted.",
+		"es": "⚠️ MODO SIMULACIÓN: No se copiarán, enlazarán ni borrarán archivos.",
+	},
+	"update_backup_mkdir_fail": {
+		"en": "❌ Failed to create snapshot directory: %v",
+		"es": "❌ Error al crear directorio de snapshot: %v",
+	},
+	"update_backup_linking": {
+		"en": "🔗 Linking unchanged files from previous backup: %s",
+		"es": "🔗 Enlazando archivos sin cambios del backup anterior: %s",
+	},
+	"update_backup_history_loaded": {
+		"en": "📜 Loaded history with %d exports.",
+		"es": "📜 Historial cargado con %d exportaciones.",
+	},
+	"update_backup_history_fail": {
+		"en": "⚠️ Could not load history.json (%v). Processing in directory order.",
+		"es": "⚠️ No se pudo cargar history.json (%v). Procesando en orden de directorio.",
+	},
+	"update_backup_index_loaded": {
+		"en": "✅ Loaded processing index from %s: %d completed exports, %d archives.",
+		"es": "✅ Índice de procesamiento cargado desde %s: %d exportaciones completadas, %d archivos.",
+	},
+	"update_backup_index_missing": {
+		"en": "⚠️ Could not find processing_index.json (checked %s). Validation will fail.",
+		"es": "⚠️ No se pudo encontrar processing_index.json (comprobado %s). La validación fallará.",
+	},
+	"update_backup_implicit_complete": {
+		"en": "⚠️ Export %s implicitly complete (all archives processed). Updating index...",
+		"es": "⚠️ Exportación %s implícitamente completa (todos los archivos procesados). Actualizando índice...",
+	},
+	"update_backup_index_updated": {
+		"en": "✅ processing_index.json updated.",
+		"es": "✅ processing_index.json actualizado.",
+	},
+	"update_backup_skip_incomplete": {
+		"en": "⚠️ Skipping incomplete export: %s (not fully processed)",
+		"es": "⚠️ Saltando exportación incompleta: %s (no totalmente procesada)",
+	},
+	"update_backup_processing": {
+		"en": "📦 Processing Archive: %s",
+		"es": "📦 Procesando Archivo: %s",
+	},
+	"update_backup_fail_export": {
+		"en": "❌ Failed to backup %s: %v",
+		"es": "❌ Fallo al hacer backup de %s: %v",
+	},
+	"update_backup_delete_content": {
+		"en": "🧹 Deleting media content for export: %s",
+		"es": "🧹 Borrando contenido multimedia de exportación: %s",
+	},
+	"update_backup_delete_fail": {
+		"en": "Failed to delete %s: %v",
+		"es": "Fallo al borrar %s: %v",
+	},
+	"update_backup_dry_delete": {
+		"en": "🧹 [Dry Run] Would delete: %s",
+		"es": "🧹 [Simulación] Borraría: %s",
+	},
+	"update_backup_no_exports": {
+		"en": "⚠️ No valid exports processed. Check 'process' status or source path.",
+		"es": "⚠️ No se procesaron exportaciones válidas. Comprueba el estado de 'process' o la ruta de origen.",
+	},
+	"update_backup_log_updated": {
+		"en": "📝 Backup log updated: %s",
+		"es": "📝 Log de backup actualizado: %s",
+	},
+	"update_backup_summary_links": {
+		"en": "   🔗 Hardlinks from previous: %d",
+		"es": "   🔗 Hardlinks desde anterior: %d",
+	},
+	"update_backup_summary_internal": {
+		"en": "   🔗 Internal hardlinks preserved: %d",
+		"es": "   🔗 Hardlinks internos preservados: %d",
+	},
+	"update_backup_summary_exports": {
+		"en": "   📦 Exports Processed: %d",
+		"es": "   📦 Exportaciones Procesadas: %d",
+	},
+	"update_backup_copied": {
+		"en": "➕ Copied: %s",
+		"es": "➕ Copiado: %s",
+	},
+	"fix_hardlinks_start": {
+		"en": "Starting Fix Hardlinks...",
+		"es": "Iniciando Fix Hardlinks...",
+	},
+	"fix_hardlinks_scan": {
+		"en": "📂 Scanning backups in: %s",
+		"es": "📂 Escaneando backups en: %s",
+	},
+	"fix_hardlinks_dry": {
+		"en": "⚠️ DRY RUN MODE",
+		"es": "⚠️ MODO SIMULACIÓN",
+	},
+	"fix_hardlinks_not_enough": {
+		"en": "Not enough snapshots to deduplicate.",
+		"es": "No hay suficientes snapshots para deduplicar.",
+	},
+	"fix_hardlinks_analyze": {
+		"en": "🔍 Analyzing snapshot: %s",
+		"es": "🔍 Analizando snapshot: %s",
+	},
+	"fix_hardlinks_would_link": {
+		"en": "Would link: %s -> %s",
+		"es": "Enlazaría: %s -> %s",
+	},
+	"fix_hardlinks_complete": {
+		"en": "✅ Fix Hardlinks Complete.",
+		"es": "✅ Fix Hardlinks Completado.",
+	},
+	"fix_hardlinks_processed": {
+		"en": "   Files Processed: %d",
+		"es": "   Archivos Procesados: %d",
+	},
+	"fix_hardlinks_linked": {
+		"en": "   Duplicates Linked: %d",
+		"es": "   Duplicados Enlazados: %d",
+	},
+	"fix_hardlinks_saved": {
+		"en": "   Space Saved: %s",
+		"es": "   Espacio Ahorrado: %s",
+	},
+	"status_finalizing": {
+		"en": "Finalizing",
+		"es": "Finalizando",
+	},
+	"sync_history_error": {
+		"en": "⚠️  Could not load history: %v",
+		"es": "⚠️  No se pudo cargar el historial: %v",
+	},
+	"sync_ghost_removed": {
+		"en": "🧹 Removed %d incomplete/ghost entries from history.",
+		"es": "🧹 Eliminadas %d entradas incompletas/fantasma del historial.",
+	},
+	"sync_migrate_fail": {
+		"en": "❌ Failed to migrate state: %v",
+		"es": "❌ Fallo al migrar estado: %v",
+	},
+	"sync_found_completed": {
+		"en": "✅ Found completed file: %s (Size: %s)",
+		"es": "✅ Encontrado fichero completado: %s (Tamaño: %s)",
+	},
+	"sync_export_set": {
+		"en": "📦 Export Set Detected: %d files, Total: %s",
+		"es": "📦 Conjunto de exportación detectado: %d ficheros, Total: %s",
+	},
+	"sync_download_start": {
+		"en": "⬇️  Starting: %s (%s)",
+		"es": "⬇️  Iniciando: %s (%s)",
+	},
+	"sync_download_finish": {
+		"en": "✅ Finished: %s (%s)",
+		"es": "✅ Finalizado: %s (%s)",
+	},
+	"sync_quota_exceeded": {
+		"en": "⛔ Download quota exceeded (Quota Exceeded).",
+		"es": "⛔ Límite de descargas excedido (Quota Exceeded).",
+	},
+	"sync_quota_action": {
+		"en": "⚠️  Marking export as EXPIRED and cleaning up partial data.",
+		"es": "⚠️  Marcando exportación como EXPIRADA y limpiando datos parciales.",
+	},
+	"sync_cleanup_error": {
+		"en": "❌ Error deleting download directory: %v",
+		"es": "❌ Error eliminando directorio de descarga: %v",
+	},
+	"sync_cleanup_success": {
+		"en": "🧹 Download directory deleted.",
+		"es": "🧹 Directorio de descarga eliminado.",
+	},
+	"sync_new_export": {
+		"en": "✅ New export created with ID: %s",
+		"es": "✅ Nueva exportación creada con ID: %s",
+	},
+	"sync_pending_export": {
+		"en": "⚠️  Export created but ID not yet visible. Saving as pending.",
+		"es": "⚠️  Exportación creada pero ID aún no visible. Guardando como pendiente.",
 	},
 }
 

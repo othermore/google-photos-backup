@@ -3,6 +3,7 @@ package cmd
 import (
 	"path/filepath"
 
+	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/processor"
 
@@ -49,10 +50,10 @@ var processCmd = &cobra.Command{
 			albumsDir = filepath.Join(outputDir, "albums")
 		}
 
-		logger.Info("🚀 Starting Processing Phase")
-		logger.Info("📂 Input: %s", inputDir)
-		logger.Info("📂 Output: %s", outputDir)
-		logger.Info("📂 Albums: %s", albumsDir)
+		logger.Info(i18n.T("process_start"))
+		logger.Info(i18n.T("process_input"), inputDir)
+		logger.Info(i18n.T("process_output"), outputDir)
+		logger.Info(i18n.T("process_albums"), albumsDir)
 
 		pm := processor.NewManager(inputDir, outputDir, albumsDir)
 		pm.DeleteOrigin, _ = cmd.Flags().GetBool("delete-origin")
@@ -72,9 +73,9 @@ var processCmd = &cobra.Command{
 		}
 
 		if err := pm.Run(); err != nil {
-			logger.Error("❌ Processing failed: %v", err)
+			logger.Error(i18n.T("process_fail"), err)
 		} else {
-			logger.Info("✅ Processing completed successfully.")
+			logger.Info(i18n.T("process_success"))
 		}
 	},
 }
@@ -85,7 +86,8 @@ func init() {
 	processCmd.Flags().StringP("input", "i", "", "Directory containing downloaded ZIP/TGZ files")
 	processCmd.Flags().StringP("output", "o", "", "Directory for extracted and processed files")
 	processCmd.Flags().StringP("albums", "a", "", "Directory for album symlinks")
-	processCmd.Flags().Bool("delete-origin", false, "Delete original ZIP/TGZ files after successful extraction (Saves space)")
+	processCmd.Flags().Bool("delete-origin", true, "Delete original archives after extraction")
+	processCmd.Flags().Bool("force", false, "Force processing even if already done")
 
 	// Granular Force Flags
 	processCmd.Flags().Bool("force-metadata", false, "Force metadata correction (dates) for already processed exports")

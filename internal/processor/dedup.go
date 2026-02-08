@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"google-photos-backup/internal/logger"
 )
@@ -95,36 +96,31 @@ func (m *Manager) DeduplicateAndOrganize() error {
 			// Logic:
 			// instance -> primary
 
-			// Check if instance is ALREADY a symlink to primary
-			if m.isCorrectSymlink(instance.Path, primary.Path) {
+			// Check if ALREADY hardlinked (same inode)
+			if m.areHardlinked(instance.Path, primary.Path) {
 				continue
 			}
 
-			// If it's a file, delete it
-			if info, err := os.Lstat(instance.Path); err == nil {
-				if info.Mode()&os.ModeSymlink == 0 {
-					// It's a real file (duplicate). Delete it.
-					if err := os.Remove(instance.Path); err != nil {
-						logger.Error("❌ Failed to remove duplicate %s: %v", instance.Path, err)
-						continue
-					}
-					// logger.Info("🗑️  Removed duplicate: %s", filepath.Base(instance.Path))
-				} else {
-					// It's a symlink pointing somewhere else. Remove it to re-link correctly.
-					os.Remove(instance.Path)
+			// If it's a file, delete it so we can create the link
+			// (We rely on HASH equality to know content is same)
+			if _, err := os.Stat(instance.Path); err == nil {
+				if err := os.Remove(instance.Path); err != nil {
+					logger.Error("❌ Failed to remove duplicate %s: %v", instance.Path, err)
+					continue
 				}
 			}
 
-			// Create Relative Symlink
-			if err := m.createRelativeSymlink(primary.Path, instance.Path); err != nil {
-				logger.Error("❌ Failed to link %s -> %s: %v", instance.Path, primary.Path, err)
+			// Create Hardlink
+			// primary.Path (existing) -> instance.Path (new link)
+			if err := os.Link(primary.Path, instance.Path); err != nil {
+				logger.Error("❌ Failed to hardlink %s -> %s: %v", instance.Path, primary.Path, err)
 			} else {
 				dedupedCount++
 			}
 		}
 	}
 
-	logger.Info("✅ Deduplication Complete. %d duplicates linked.", dedupedCount)
+	logger.Info("✅ Deduplication Complete. %d duplicates hardlinked.", dedupedCount)
 
 	return nil
 }
@@ -182,53 +178,22 @@ func (m *Manager) scorePath(path string) int {
 	return score
 }
 
-// isCorrectSymlink checks if 'path' is a symlink pointing to 'target'
-func (m *Manager) isCorrectSymlink(path, target string) bool {
-	info, err := os.Lstat(path)
+// areHardlinked checks if two paths point to the same inode on the same device
+func (m *Manager) areHardlinked(p1, p2 string) bool {
+	fi1, err := os.Stat(p1)
 	if err != nil {
 		return false
 	}
-	if info.Mode()&os.ModeSymlink == 0 {
-		return false
-	}
-
-	// Read link
-	dest, err := os.Readlink(path)
+	fi2, err := os.Stat(p2)
 	if err != nil {
 		return false
 	}
 
-	// Resolve absolute paths to compare
-	// 'dest' might be relative (../foo.jpg)
-
-	// Construct absolute path of destination
-	var absDest string
-	if filepath.IsAbs(dest) {
-		absDest = dest
-	} else {
-		absDest = filepath.Join(filepath.Dir(path), dest)
+	stat1, ok1 := fi1.Sys().(*syscall.Stat_t)
+	stat2, ok2 := fi2.Sys().(*syscall.Stat_t)
+	if !ok1 || !ok2 {
+		return false
 	}
 
-	// Compare Absolutes
-	absTarget, _ := filepath.Abs(target)
-	absDest, _ = filepath.Abs(absDest)
-
-	return absDest == absTarget
-}
-
-// createRelativeSymlink creates a relative link at 'linkAbs' pointing to 'targetAbs'
-func (m *Manager) createRelativeSymlink(targetAbs, linkAbs string) error {
-	// Ensure parent dir exists
-	if err := os.MkdirAll(filepath.Dir(linkAbs), 0755); err != nil {
-		return err
-	}
-
-	// Calculate relative path: linkDir -> target
-	rel, err := filepath.Rel(filepath.Dir(linkAbs), targetAbs)
-	if err != nil {
-		// Fallback to absolute
-		return os.Symlink(targetAbs, linkAbs)
-	}
-
-	return os.Symlink(rel, linkAbs)
+	return stat1.Ino == stat2.Ino && stat1.Dev == stat2.Dev
 }

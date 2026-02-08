@@ -58,6 +58,7 @@ The config is stored at `~/.config/google-photos-backup/config.yaml`.
 | `backup_frequency` | `168h` | How often to request a new backup (e.g., `24h`, `168h` = 7 days). |
 | `download_mode` | `directDownload` | Mode of operation. Currently only `directDownload` is supported. |
 | `fix_ambiguous_metadata` | `interactive` | Default behavior for ambiguous matches (`yes`, `no`, `interactive`). |
+| `final_backup_path` | (empty) | Path to the final backup destination. |
 | `user_data_dir` | (auto) | Path to Chrome user profile data (do not change unless necessary). |
 
 ## Export Status Lifecycle
@@ -117,10 +118,40 @@ After `sync` downloads the files, this command extracts, fixes metadata, and org
 **Flags:**
 
 *   `--fix-ambiguous-metadata`: Behavior for ambiguous metadata matches (`yes`=apply, `no`=skip, `interactive`=ask). Default: `interactive`.
+*   `--delete-origin`: Delete original ZIP/TGZ files after successful extraction to save space. Default: `true`.
 *   `--force-metadata`: Re-runs date correction on already processed exports.
 *   `--force-dedup`: Re-runs the duplicate check. Forces a full SHA256 scan of existing files to ensure index integrity.
 *   `--force-extract`: Re-extracts archives. Overwrites existing files.
 *   `--export <ID>`: Runs processing ONLY on the specified Export ID.
+
+### 3. Update Backup (Final Sync)
+
+After processing, this command synchronizes the organized files to your final storage location (e.g., NAS, external drive).
+
+```bash
+./gpb update-backup [flags]
+```
+
+**Features:**
+*   **Additive Only:** Moves new files to the final destination (using `mv` for efficiency where possible). Existing files are skipped.
+*   **Logging:** Exact details of every operation are saved to `backup_log.jsonl` in the final directory (timestamp, file list, size).
+*   **Cleanup:** If successful, deletes the source `raw` media files to free up space, but keeps metadata (`state.json`) for reference.
+
+**Flags:**
+*   `--dry-run`: Simulate the update without moving or deleting files.
+*   `--source <dir>`: Manually specify the source directory (defaults to processed output).
+
+### 4. Fix Hardlinks (Deduplication)
+
+Scans your final backup snapshots to maximize space savings by hardlinking identical files across backups.
+
+```bash
+./gpb fix-hardlinks [flags]
+```
+
+**Flags:**
+*   `--dry-run`: Simulate the deduplication without modifying files.
+*   `--path <dir>`: Path to the backup root (defaults to configured `final_backup_path`).
 
 ### How it Works
 
