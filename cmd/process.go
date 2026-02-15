@@ -35,10 +35,10 @@ var processCmd = &cobra.Command{
 
 		// Validate directories
 		if inputDir == "" {
-			// Try to infer from backup_path
-			backupPath := viper.GetString("backup_path")
-			if backupPath != "" {
-				inputDir = filepath.Join(backupPath, "downloads")
+			// Try to infer from working_path
+			workingPath := viper.GetString("working_path")
+			if workingPath != "" {
+				inputDir = filepath.Join(workingPath, "downloads")
 			} else {
 				inputDir = "downloads"
 			}

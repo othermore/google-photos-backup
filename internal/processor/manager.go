@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"google-photos-backup/internal/logger"
@@ -33,6 +34,9 @@ type Manager struct {
 	// Set of processed Archive paths (relative to ID?) to support partial reprocessing
 	// Key: ID/Filename
 	ProcessedArchives map[string]bool
+
+	// Index: Key = Inode, Value = Absolute Path (First seen)
+	InodeIndex map[uint64]string
 }
 
 type FileMetadata struct {
@@ -51,6 +55,7 @@ func NewManager(inputDir, outputDir, albumsDir string) *Manager {
 		FileIndex:         make(map[string]FileMetadata),
 		ProcessedExports:  make(map[string]bool),
 		ProcessedArchives: make(map[string]bool),
+		InodeIndex:        make(map[uint64]string),
 	}
 }
 
@@ -104,8 +109,24 @@ func (m *Manager) ScanRaw(dir string, computeHash bool) error {
 			return nil
 		}
 
+		// Get Inode
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return nil
+		}
+		inode := stat.Ino
+
 		hash := ""
-		if computeHash {
+
+		// Check Inode Cache
+		if existingPath, ok := m.InodeIndex[inode]; ok {
+			// Found same inode! Reuse hash from existing file
+			if meta, exists := m.FileIndex[existingPath]; exists {
+				hash = meta.Hash
+			}
+		}
+
+		if hash == "" && computeHash {
 			// Hash file
 			f, err := os.Open(path)
 			if err != nil {
@@ -120,6 +141,7 @@ func (m *Manager) ScanRaw(dir string, computeHash bool) error {
 			hash = hex.EncodeToString(hasher.Sum(nil))
 		}
 
+		// Update Indices
 		ext := strings.ToLower(filepath.Ext(path))
 		m.FileIndex[absPath] = FileMetadata{
 			Path:      absPath,
@@ -128,6 +150,14 @@ func (m *Manager) ScanRaw(dir string, computeHash bool) error {
 			Extension: ext,
 			IsJSON:    ext == ".json",
 		}
+
+		// Register Inode if it has a hash and not already in index
+		if hash != "" {
+			if _, ok := m.InodeIndex[inode]; !ok {
+				m.InodeIndex[inode] = absPath
+			}
+		}
+
 		return nil
 	})
 }

@@ -54,11 +54,11 @@ The config is stored at `~/.config/google-photos-backup/config.yaml`.
 
 | Key | Default | Description |
 | :--- | :--- | :--- |
-| `backup_path` | `./backup` | Main directory where backups will be stored. |
+| `working_path` | `./work` | Directory to store downloads and temporary processing files. |
 | `backup_frequency` | `168h` | How often to request a new backup (e.g., `24h`, `168h` = 7 days). |
 | `download_mode` | `directDownload` | Mode of operation. Currently only `directDownload` is supported. |
 | `fix_ambiguous_metadata` | `interactive` | Default behavior for ambiguous matches (`yes`, `no`, `interactive`). |
-| `final_backup_path` | (empty) | Path to the final backup destination. |
+| `backup_path` | (empty) | Path to the final backup destination (snapshots). |
 | `user_data_dir` | (auto) | Path to Chrome user profile data (do not change unless necessary). |
 
 ## Export Status Lifecycle
@@ -120,7 +120,7 @@ After `sync` downloads the files, this command extracts, fixes metadata, and org
 *   `--fix-ambiguous-metadata`: Behavior for ambiguous metadata matches (`yes`=apply, `no`=skip, `interactive`=ask). Default: `interactive`.
 *   `--delete-origin`: Delete original ZIP/TGZ files after successful extraction to save space. Default: `true`.
 *   `--force-metadata`: Re-runs date correction on already processed exports.
-*   `--force-dedup`: Re-runs the duplicate check. Forces a full SHA256 scan of existing files to ensure index integrity.
+*   `--force-dedup`: Re-runs the duplicate check within the working directory.
 *   `--force-extract`: Re-extracts archives. Overwrites existing files.
 *   `--export <ID>`: Runs processing ONLY on the specified Export ID.
 
@@ -133,17 +133,18 @@ After processing, this command synchronizes the organized files to your final st
 ```
 
 **Features:**
-*   **Additive Only:** Moves new files to the final destination (using `mv` for efficiency where possible). Existing files are skipped.
-*   **Logging:** Exact details of every operation are saved to `backup_log.jsonl` in the final directory (timestamp, file list, size).
-*   **Cleanup:** If successful, deletes the source `raw` media files to free up space, but keeps metadata (`state.json`) for reference.
+*   **Snapshots:** Creates a timestamped folder for each backup run.
+*   **Smart Deduplication:** Checks if files already exist in the *previous backup*. If content matches (Hash check), it creates a **hardlink** instead of copying. This saves massive Space!
+*   **Logging:** Exact details of every operation are saved to `backup_log.jsonl` in the final directory.
+*   **Cleanup:** If successful, deletes the processed files from `working_path` to free up space.
 
 **Flags:**
 *   `--dry-run`: Simulate the update without moving or deleting files.
-*   `--source <dir>`: Manually specify the source directory (defaults to processed output).
+*   `--source <dir>`: Manually specify the source directory (defaults to `working_path/downloads`).
 
 ### 4. Fix Hardlinks (Deduplication)
 
-Scans your final backup snapshots to maximize space savings by hardlinking identical files across backups.
+Scans your legacy or manually modified backup snapshots to maximize space savings by hardlinking identical files across snapshots.
 
 ```bash
 ./gpb fix-hardlinks [flags]

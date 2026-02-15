@@ -29,9 +29,9 @@ var configureCmd = &cobra.Command{
 		fmt.Println("========================================")
 		fmt.Println("")
 
-		// 1. Backup Dir
-		backupPath := prompt(i18n.T("prompt_backup_dir"), config.AppConfig.BackupPath)
-		absPath, _ := filepath.Abs(backupPath)
+		// 1. Working Dir (Download/Process)
+		workingPath := prompt(i18n.T("prompt_working_dir"), config.AppConfig.WorkingPath)
+		absWorkingPath, _ := filepath.Abs(workingPath)
 
 		// 2. Download Mode
 		currentMode := config.AppConfig.DownloadMode
@@ -61,20 +61,20 @@ var configureCmd = &cobra.Command{
 			fixMode = "interactive"
 		}
 
-		// 4. Final Backup Path
-		currentFinalPath := config.AppConfig.FinalBackupPath
-		finalPathPrompt := i18n.T("prompt_final_backup")
-		if currentFinalPath != "" {
-			finalPathPrompt = fmt.Sprintf("%s [default: %s]", finalPathPrompt, currentFinalPath)
+		// 4. Backup Path (Storage)
+		currentBackupPath := config.AppConfig.BackupPath
+		backupPathPrompt := i18n.T("prompt_backup_path")
+		if currentBackupPath != "" {
+			backupPathPrompt = fmt.Sprintf("%s [default: %s]", backupPathPrompt, currentBackupPath)
 		}
-		finalBackupPath := prompt(finalPathPrompt, currentFinalPath)
-		absFinalPath, _ := filepath.Abs(finalBackupPath)
+		backupPath := prompt(backupPathPrompt, currentBackupPath)
+		absBackupPath, _ := filepath.Abs(backupPath)
 
 		// 5. Guardar
-		viper.Set("backup_path", absPath)
+		viper.Set("working_path", absWorkingPath)
 		viper.Set("download_mode", dlMode)
 		viper.Set("fix_ambiguous_metadata", fixMode)
-		viper.Set("final_backup_path", absFinalPath)
+		viper.Set("backup_path", absBackupPath)
 
 		if viper.ConfigFileUsed() == "" {
 			home, _ := os.UserHomeDir()
@@ -100,17 +100,17 @@ var configureCmd = &cobra.Command{
 		confirm := prompt(i18n.T("login_ask"), "")
 		ans := strings.ToLower(confirm)
 		if ans == "s" || ans == "y" || ans == "yes" || ans == "si" {
-			loginFlow(absPath)
+			loginFlow(absWorkingPath)
 		}
 	},
 }
 
-func loginFlow(backupPath string) {
+func loginFlow(workingPath string) {
 	fmt.Println(i18n.T("login_start"))
 	fmt.Println(i18n.T("browser_open"))
 
 	// Usamos el directorio de backup para guardar la sesión del navegador (carpeta 'browser_data')
-	userDataDir := filepath.Join(backupPath, "browser_data")
+	userDataDir := filepath.Join(workingPath, "browser_data")
 
 	// Headless = false para que el usuario pueda ver y escribir
 	bm := browser.New(userDataDir, false)

@@ -187,21 +187,21 @@ var syncCmd = &cobra.Command{
 		fmt.Println(i18n.T("sync_start"))
 
 		// Asegurarse de que la ruta de backup está configurada
-		if config.AppConfig.BackupPath == "" {
+		if config.AppConfig.WorkingPath == "" {
 			logger.Error(i18n.T("backup_dir_error"))
 			return
 		}
 
 		// Asegurarse de que el directorio de backup existe
-		if err := os.MkdirAll(config.AppConfig.BackupPath, 0755); err != nil {
+		if err := os.MkdirAll(config.AppConfig.WorkingPath, 0755); err != nil {
 			logger.Error(i18n.T("backup_mkdir_error"), err)
 			return
 		}
 
-		userDataDir := filepath.Join(config.AppConfig.BackupPath, "browser_data")
+		userDataDir := filepath.Join(config.AppConfig.WorkingPath, "browser_data")
 
 		// Cargar registro de exportaciones (history.json en la carpeta de backup)
-		regPath := filepath.Join(config.AppConfig.BackupPath, "history.json")
+		regPath := filepath.Join(config.AppConfig.WorkingPath, "history.json")
 		reg, err := registry.New(regPath)
 		if err != nil {
 			fmt.Printf(i18n.T("sync_history_error")+"\n", err)
@@ -337,7 +337,7 @@ var syncCmd = &cobra.Command{
 
 			// Crear carpeta de descargas específica para esta exportación
 			// Ej: backup_path/downloads/ID_EXPORTACION
-			downloadDir := filepath.Join(config.AppConfig.BackupPath, "downloads", completedStatus.ID)
+			downloadDir := filepath.Join(config.AppConfig.WorkingPath, "downloads", completedStatus.ID)
 			if err := os.MkdirAll(downloadDir, 0755); err != nil {
 				logger.Error(i18n.T("download_dir_error"), err)
 				return

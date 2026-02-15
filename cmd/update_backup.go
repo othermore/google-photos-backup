@@ -38,29 +38,29 @@ var updateBackupCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Info(i18n.T("update_backup_start"))
 
-		finalPath := config.AppConfig.FinalBackupPath
-		if finalPath == "" {
-			finalPath = viper.GetString("final_backup_path")
+		backupPath := config.AppConfig.BackupPath
+		if backupPath == "" {
+			backupPath = viper.GetString("backup_path")
 		}
-		finalPath = expandPath(finalPath)
+		backupPath = expandPath(backupPath)
 
-		if finalPath == "" {
+		if backupPath == "" {
 			logger.Error(i18n.T("update_backup_no_config"))
 			return
 		}
 
 		// Determine Source Root (downloads folder)
-		// Default: backup_path/downloads
+		// Default: working_path/downloads
 		rootSource, _ := cmd.Flags().GetString("source")
 		if rootSource == "" {
-			backupPath := config.AppConfig.BackupPath
-			if backupPath == "" {
-				backupPath = viper.GetString("backup_path")
+			workingPath := config.AppConfig.WorkingPath
+			if workingPath == "" {
+				workingPath = viper.GetString("working_path")
 			}
-			backupPath = expandPath(backupPath)
+			workingPath = expandPath(workingPath)
 
-			if backupPath != "" {
-				rootSource = filepath.Join(backupPath, "downloads")
+			if workingPath != "" {
+				rootSource = filepath.Join(workingPath, "downloads")
 			} else {
 				rootSource = "downloads"
 			}
@@ -78,7 +78,7 @@ var updateBackupCmd = &cobra.Command{
 
 		// Create Snapshot Directory
 		timestamp := time.Now().Format("2006-01-02-150405")
-		snapshotDir := filepath.Join(finalPath, timestamp)
+		snapshotDir := filepath.Join(backupPath, timestamp)
 		logger.Info(i18n.T("update_backup_dest"), snapshotDir)
 
 		if dryRun {
@@ -91,20 +91,20 @@ var updateBackupCmd = &cobra.Command{
 		}
 
 		// Find Previous Backup
-		prevBackup := findLatestBackup(finalPath)
+		prevBackup := findLatestBackup(backupPath)
 		if prevBackup != "" {
 			logger.Info(i18n.T("update_backup_linking"), filepath.Base(prevBackup))
 		}
 
 		// Load History for Ordering
-		// Typically in backup_path/history.json
-		backupPath := config.AppConfig.BackupPath
-		if backupPath == "" {
-			backupPath = viper.GetString("backup_path")
+		// Typically in working_path/history.json
+		workingPath := config.AppConfig.WorkingPath
+		if workingPath == "" {
+			workingPath = viper.GetString("working_path")
 		}
-		backupPath = expandPath(backupPath)
+		workingPath = expandPath(workingPath)
 
-		historyPath := filepath.Join(backupPath, "history.json")
+		historyPath := filepath.Join(workingPath, "history.json")
 		reg, err := registry.New(historyPath)
 		var validExports []registry.ExportEntry
 		if err == nil {
@@ -125,7 +125,7 @@ var updateBackupCmd = &cobra.Command{
 		// Attempt to locate processing_index.json
 		candidates := []string{
 			filepath.Join(rootSource, "processing_index.json"),
-			filepath.Join(backupPath, "output", "processing_index.json"),
+			filepath.Join(workingPath, "output", "processing_index.json"),
 		}
 		if outDir := viper.GetString("output_dir"); outDir != "" {
 			candidates = append(candidates, filepath.Join(expandPath(outDir), "processing_index.json"))
@@ -264,10 +264,20 @@ var updateBackupCmd = &cobra.Command{
 
 			logger.Info(i18n.T("update_backup_processing"), exportID)
 
+			// Load File Index from process step
+			var exportFileIndex map[string]processor.FileMetadata
+			exportIndexPath := filepath.Join(exportPath, "processing_index.json")
+			if data, err := os.ReadFile(exportIndexPath); err == nil {
+				var state processor.State
+				if err := json.Unmarshal(data, &state); err == nil {
+					exportFileIndex = state.FileIndex
+				}
+			}
+
 			// Run Backup Logic for this Export
 			startBytes := totalStats.Bytes
 
-			err := backupExport(exportPath, snapshotDir, prevBackup, inodeMap, &totalStats, dryRun)
+			err := backupExport(exportPath, snapshotDir, prevBackup, inodeMap, exportFileIndex, &totalStats, dryRun)
 			if err != nil {
 				logger.Error(i18n.T("update_backup_fail_export"), exportID, err)
 			} else {
@@ -342,7 +352,7 @@ var updateBackupCmd = &cobra.Command{
 				Files:     totalStats.Files,
 			}
 
-			logPath := filepath.Join(finalPath, "backup_log.jsonl")
+			logPath := filepath.Join(backupPath, "backup_log.jsonl")
 			f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				logger.Error("❌ Failed to open backup log: %v", err)
@@ -366,12 +376,12 @@ var updateBackupCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(updateBackupCmd)
-	updateBackupCmd.Flags().String("source", "", "Source directory (defaults to backup_path/downloads)")
+	updateBackupCmd.Flags().String("source", "", "Source directory (defaults to working_path/downloads)")
 	updateBackupCmd.Flags().Bool("dry-run", false, "Simulate the update")
 }
 
 // backupExport recursively backups a single export directory
-func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint64]string, stats *struct {
+func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint64]string, fileIndex map[string]processor.FileMetadata, stats *struct {
 	Added    int
 	Linked   int
 	Internal int
@@ -418,6 +428,10 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 	// Dest = snapshot/Google Photos/Album/Img.jpg
 
 	targetDestRoot := filepath.Join(snapshotRoot, "Google Photos")
+	prevDestRoot := ""
+	if prevBackupRoot != "" {
+		prevDestRoot = filepath.Join(prevBackupRoot, "Google Photos")
+	}
 
 	return filepath.Walk(contentRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -458,7 +472,7 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 		}
 		inode := stat.Ino
 
-		// 1. Check Internal Hardlink / Previous Backup
+		// 1. Check Internal Hardlink (Intra-Snapshot Deduplication)
 		linkedFromPrev := false
 		if prevPath, ok := inodeMap[inode]; ok {
 			// Found in previous backup or internal map! Link it.
@@ -472,12 +486,65 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 				// If it was internal from same run, it also counts.
 				inodeMap[inode] = destPath // Update map
 				linkedFromPrev = true
+				return nil
 			} else {
-				logger.Info("⚠️ Failed to link from previous %s: %v. Will copy/move.", prevPath, err)
+				logger.Info("⚠️ Failed to link from internal/map %s: %v. Will copy/move.", prevPath, err)
 			}
 		}
 
-		// 2. Copy/Move (New File)
+		// 2. Check Previous Backup (Inter-Snapshot Deduplication)
+		if !linkedFromPrev && prevDestRoot != "" {
+			prevFile := filepath.Join(prevDestRoot, relPath)
+			if prevInfo, err := os.Stat(prevFile); err == nil {
+				// Candidate exists in previous backup!
+				// Check Size
+				if prevInfo.Size() == info.Size() {
+					// Size matches. Check Hash.
+					// Get Source Hash from Index
+					sourceHash := ""
+					if meta, ok := fileIndex[path]; ok {
+						sourceHash = meta.Hash
+					}
+
+					// Get Dest Hash (Compute)
+					// Only compute if we have source hash (otherwise comparison impossible efficiently?)
+					// Or just compute both if source missing?
+					// Safe: compute both if source missing.
+
+					match := false
+					if sourceHash != "" {
+						destHash, err := calculateHash(prevFile)
+						if err == nil && destHash == sourceHash {
+							match = true
+						}
+					} else {
+						// Fallback: Compute both
+						h1, _ := calculateHash(path)
+						h2, _ := calculateHash(prevFile)
+						if h1 != "" && h1 == h2 {
+							match = true
+						}
+					}
+
+					if match {
+						// Deduplicate against Previous Backup!
+						if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+							return err
+						}
+						// Hardlink: Dest -> Previous
+						if err := os.Link(prevFile, destPath); err == nil {
+							stats.Linked++
+							inodeMap[inode] = destPath
+							linkedFromPrev = true
+							logger.Info(i18n.T("update_backup_linked_prev"), relPath)
+							return nil
+						}
+					}
+				}
+			}
+		}
+
+		// 3. Copy/Move (New File)
 		if !linkedFromPrev {
 			if err := moveFile(path, destPath); err != nil {
 				logger.Error("Failed to move/copy %s: %v", relPath, err)

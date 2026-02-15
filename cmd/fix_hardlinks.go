@@ -26,25 +26,25 @@ var fixHardlinksCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Info("Starting Fix Hardlinks...")
 
-		finalPath := config.AppConfig.FinalBackupPath
-		if finalPath == "" {
-			finalPath = viper.GetString("final_backup_path")
+		backupPath := config.AppConfig.BackupPath
+		if backupPath == "" {
+			backupPath = viper.GetString("backup_path")
 		}
 
-		if finalPath == "" {
+		if backupPath == "" {
 			logger.Error(i18n.T("update_backup_no_config"))
 			return
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		logger.Info(i18n.T("fix_hardlinks_scan"), finalPath)
+		logger.Info(i18n.T("fix_hardlinks_scan"), backupPath)
 
 		if dryRun {
 			logger.Info(i18n.T("fix_hardlinks_dry"))
 		}
 
 		// 1. List Snapshots (Oldest First)
-		entries, err := os.ReadDir(finalPath)
+		entries, err := os.ReadDir(backupPath)
 		if err != nil {
 			logger.Error("Error reading backup dir: %v", err)
 			return
@@ -76,7 +76,7 @@ var fixHardlinksCmd = &cobra.Command{
 		processedFiles := 0
 
 		for _, snapName := range snapshots {
-			snapPath := filepath.Join(finalPath, snapName)
+			snapPath := filepath.Join(backupPath, snapName)
 			logger.Info(i18n.T("fix_hardlinks_analyze"), snapName)
 
 			err := filepath.Walk(snapPath, func(path string, info os.FileInfo, err error) error {

@@ -1,0 +1,17 @@
+# Directory to store downloads and temporary processing files
+working_path: "./work"
+
+# Frequency of backups (e.g. 24h, 168h=7days)
+backup_frequency: "168h"
+
+# Destination for final organized photos (snapshots)
+backup_path: "/Volumes/ExternalDrive/PhotosBackup"
+
+# Download mode (directDownload, driveDownload)
+download_mode: "directDownload"
+
+# Interactive metadata fixing
+fix_ambiguous_metadata: "interactive"
+
+# User ID (optional)
+# user_id: "me"

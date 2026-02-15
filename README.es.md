@@ -54,11 +54,11 @@ La configuración se almacena en `~/.config/google-photos-backup/config.yaml`.
 
 | Clave | Valor por Defecto | Descripción |
 | :--- | :--- | :--- |
-| `backup_path` | `./backup` | Directorio principal donde se guardarán las copias. |
+| `working_path` | `./work` | Directorio de trabajo para descargas y archivos temporales. |
 | `backup_frequency` | `168h` | Frecuencia para solicitar nuevas copias (ej. `24h`, `168h` = 7 días). |
 | `download_mode` | `directDownload` | Modo de operación. Actualmente solo se soporta `directDownload`. |
 | `fix_ambiguous_metadata` | `interactive` | Comportamiento para coincidencias ambiguas (`yes`, `no`, `interactive`). |
-| `final_backup_path` | (vacío) | Ruta al destino final de la copia de seguridad. |
+| `backup_path` | (vacío) | Ruta al destino final de la copia de seguridad (snapshots). |
 | `user_data_dir` | (auto) | Ruta al perfil de usuario de Chrome (no cambiar salvo necesario). |
 
 ## Ciclo de Vida de una Exportación
@@ -110,7 +110,7 @@ Una vez descargados los archivos, este comando extrae, corrige metadatos y organ
         *   **Nivel 2 (Limpio)**: Coincide eliminando extensión (ej. `IMG_123.jpg` -> `IMG_123.json`).
         *   **Nivel 3 (Difuso/Seguro)**: Coincide nombres truncados si la longitud común es **>40 caracteres** (evita que `IMG.json` coincida con `IMG_1234.jpg`).
     *   **Coincidencias Ambiguas**: Las coincidencias parciales menores de 40 caracteres usan el comportamiento definido por `--fix-ambiguous-metadata`.
-3.  **Deduplicación Global**: Escanea todos los ficheros, identifica duplicados (SHA256) y mantiene la mejor versión.
+3.  **Deduplicación Global**: Escanea todos los ficheros, identifica duplicados (SHA256) y mantiene la mejor versión. Los duplicados se reemplazan con enlaces simbólicos relativos para ahorrar espacio.
 
 **Flags:**
 
@@ -129,13 +129,26 @@ Tras procesar, este comando sincroniza los archivos organizados con tu ubicació
 ```
 
 **Características:**
-*   **Solo Aditivo:** Copia archivos nuevos al destino. Los existentes se saltan (nunca se sobrescriben ni borran).
-*   **Registro (Log):** Guarda detalles exactos de cada operación en `backup_log.jsonl` en el directorio final (fecha, lista de archivos, tamaño).
-*   **Limpieza:** Si finaliza con éxito, borra los archivos procesados originales para liberar espacio.
+*   **Snapshots:** Crea una carpeta con fecha/hora para cada ejecución.
+*   **Deduplicación Inteligente:** Comprueba si los archivos ya existen en la *copia anterior*. Si el contenido coincide (Hash), crea un **enlace duro (hardlink)** en lugar de copiar. ¡Ahorra mucho espacio!
+*   **Registro (Log):** Guarda detalles exactos de cada operación en `backup_log.jsonl` en el directorio final.
+*   **Limpieza:** Si finaliza con éxito, borra los archivos procesados del `working_path` para liberar espacio.
 
 **Flags:**
 *   `--dry-run`: Simula la actualización sin copiar ni borrar nada.
-*   `--source <dir>`: Especifica manualmente el directorio origen (por defecto usa la salida del procesado).
+*   `--source <dir>`: Especifica manualmente el directorio origen (por defecto `working_path/downloads`).
+
+### 4. Fix Hardlinks (Deduplicación)
+
+Escanea tus snapshots antiguos o modificados manualmente para maximizar el ahorro de espacio enlazando archivos idénticos entre copias.
+
+```bash
+./gpb fix-hardlinks [flags]
+```
+
+**Flags:**
+*   `--dry-run`: Simula la deduplicación sin modificar archivos.
+*   `--path <dir>`: Ruta a la raíz del backup (por defecto `backup_path`).
 
 ## Solución de Problemas
 
