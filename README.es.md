@@ -150,6 +150,24 @@ Escanea tus snapshots antiguos o modificados manualmente para maximizar el ahorr
 *   `--dry-run`: Simula la deduplicación sin modificar archivos.
 *   `--path <dir>`: Ruta a la raíz del backup (por defecto `backup_path`).
 
+### 5. Directorio Maestro para Immich (Opcional)
+
+Puedes mantener una estructura de directorios aplanada y deduplicada, optimizada para **Immich** (o cualquier biblioteca externa). Esta carpeta organiza todas tus fotos por Año/Mes usando enlaces duros (hardlinks), por lo que **no ocupa espacio adicional**.
+
+**Configuración (en `config.yaml`):**
+```yaml
+immich_master_enabled: true
+immich_master_path: "immich-master" # relativo a backup_path
+```
+
+**Características:**
+*   **Auto-Actualización:** Al ejecutar `update-backup`, las nuevas fotos se enlazan automáticamente al directorio maestro.
+*   **Estructura:** `immich-master/AAAA/MM/foto.jpg`.
+*   **Reconstrucción (Rebuild):** Puedes generar este directorio desde tus snapshots existentes en cualquier momento:
+    ```bash
+    ./gpb rebuild-immich-master
+    ```
+
 ## Solución de Problemas
 
 *   **Problemas de Login:** Si la herramienta se queda atascada verificando la sesión, prueba a ejecutar `./gpb configure` de nuevo.

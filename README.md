@@ -154,6 +154,24 @@ Scans your legacy or manually modified backup snapshots to maximize space saving
 *   `--dry-run`: Simulate the deduplication without modifying files.
 *   `--path <dir>`: Path to the backup root (defaults to configured `final_backup_path`).
 
+### 5. Immich Master Directory (Optional)
+
+You can maintain a flattened, deduplicated directory structure optimized for **Immich** (or any external library). This folder organizes all your photos by Year/Month using hardlinks, so it takes **zero additional space**.
+
+**Configuration (in `config.yaml`):**
+```yaml
+immich_master_enabled: true
+immich_master_path: "immich-master" # relative to backup_path
+```
+
+**Features:**
+*   **Auto-Update:** When running `update-backup`, new photos are automatically linked to the master directory.
+*   **Structure:** `immich-master/YYYY/MM/photo.jpg`.
+*   **Rebuild:** You can generate this directory from your existing snapshots at any time:
+    ```bash
+    ./gpb rebuild-immich-master
+    ```
+
 ### How it Works
 
 

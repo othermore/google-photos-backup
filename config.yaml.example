@@ -13,5 +13,10 @@ download_mode: "directDownload"
 # Interactive metadata fixing
 fix_ambiguous_metadata: "interactive"
 
+# Immich Master Directory (Optional)
+# Maintains a flat YYYY/MM structure with hardlinks for external libraries
+immich_master_enabled: false
+immich_master_path: "immich-master"
+
 # User ID (optional)
 # user_id: "me"

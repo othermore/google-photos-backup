@@ -581,6 +581,102 @@ var messages = map[string]map[string]string{
 		"en": "⚠️  Export created but ID not yet visible. Saving as pending.",
 		"es": "⚠️  Exportación creada pero ID aún no visible. Guardando como pendiente.",
 	},
+	"browser_waiting_content": {
+		"en": "⏳ Waiting for page content...",
+		"es": "⏳ Esperando contenido de la página...",
+	},
+	"browser_check_quota": {
+		"en": "🔍 Checking for quota limit...",
+		"es": "🔍 Comprobando límite de cuota...",
+	},
+	"browser_identify_pending": {
+		"en": "🔍 Identifying pending files...",
+		"es": "🔍 Identificando archivos pendientes...",
+	},
+	"browser_parse_url_fail": {
+		"en": "⚠️  Failed to parse base URL %s: %v",
+		"es": "⚠️  Fallo al analizar URL base %s: %v",
+	},
+	"browser_started_file": {
+		"en": "\n     ... Started: %s",
+		"es": "\n     ... Iniciado: %s",
+	},
+	"browser_unknown_start": {
+		"en": "\n⚠️  Unknown download started: %s",
+		"es": "\n⚠️  Descarga desconocida iniciada: %s",
+	},
+	"browser_js_fail": {
+		"en": "❌ JS Execution failed for part %d: %v",
+		"es": "❌ Ejecución JS falló para la parte %d: %v",
+	},
+	"browser_auth_prompt": {
+		"en": "🔑 Auth prompt detected. Attempting to enter password...",
+		"es": "🔑 Solicitud de autenticación detectada. Intentando introducir contraseña...",
+	},
+	"browser_no_pending": {
+		"en": "✅ No pending files to download.",
+		"es": "✅ No hay archivos pendientes para descargar.",
+	},
+	"browser_found_pending": {
+		"en": "📋 Found %d pending files. Scraping URLs...",
+		"es": "📋 Encontrados %d archivos pendientes. Extrayendo URLs...",
+	},
+	"browser_scraped_links": {
+		"en": "📋 Scraped %d valid download links.",
+		"es": "📋 Extraídos %d enlaces de descarga válidos.",
+	},
+	"browser_cleanup_incomplete": {
+		"en": "🧹 Cleaning up incomplete download: %s",
+		"es": "🧹 Limpiando descarga incompleta: %s",
+	},
+	"browser_all_tracked": {
+		"en": "🏁 All downloads tracked as complete. Waiting 30s for file finalization...",
+		"es": "🏁 Todas las descargas marcadas como completas. Esperando 30s para finalización de archivos...",
+	},
+	"browser_finished_failures": {
+		"en": "🏁 Process finished (with some failures). Waiting 10s before closing...",
+		"es": "🏁 Proceso finalizado (con algunos fallos). Esperando 10s antes de cerrar...",
+	},
+	"browser_firing_requests": {
+		"en": "🚀 Firing download requests via Button Click (Robust JS)...",
+		"es": "🚀 Lanzando peticiones de descarga vía Click (JS Robusto)...",
+	},
+	"browser_auth_challenge": {
+		"en": "🔐 Auth/Passkey challenge detected! Waiting for user interaction...",
+		"es": "🔐 ¡Reto de Auth/Passkey detectado! Esperando interacción del usuario...",
+	},
+	"browser_auth_instruction": {
+		"en": "👉 Please complete the authentication in the browser window.",
+		"es": "👉 Por favor completa la autenticación en la ventana del navegador.",
+	},
+	"browser_auth_timeout": {
+		"en": "❌ Auth wait timed out.",
+		"es": "❌ Tiempo de espera de autenticación agotado.",
+	},
+	"browser_auth_resolved": {
+		"en": "✅ Auth resolved! Resuming...",
+		"es": "✅ ¡Autenticación resuelta! Reanudando...",
+	},
+	"browser_quota_limit": {
+		"en": "🔍 Checking for quota limit...",
+		"es": "🔍 Comprobando límite de cuota...",
+	},
+	"browser_wait_redirect": {
+		"en": "Waiting for redirect to Manage page...",
+		"es": "Esperando redirección a la página de gestión...",
+	},
+	"browser_click_fail": {
+		"en": "❌ Failed to click part %d: %v",
+		"es": "❌ Fallo al hacer clic en la parte %d: %v",
+	},
+	"browser_detect_cancel": {
+		"en": "⚠️  Detected 'Cancel export' button. Assuming export in progress.",
+		"es": "⚠️  Detectado botón 'Cancelar exportación'. Asumiendo exportación en curso.",
+	},
+	"browser_detect_text": {
+		"en": "⚠️  Detected in-progress text on page. Waiting.",
+		"es": "⚠️  Detectado texto de 'en progreso' en la página. Esperando.",
+	},
 }
 
 // Init detecta el idioma del sistema

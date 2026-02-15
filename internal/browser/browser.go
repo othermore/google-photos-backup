@@ -27,43 +27,43 @@ const (
 	URLTakeoutArchive  = "https://takeout.google.com/manage/archive/%s?hl=en"
 )
 
-// Manager gestiona la instancia del navegador y la sesión
+// Manager manages the browser instance and session
 type Manager struct {
 	Browser *rod.Browser
-	DataDir string // Directorio para guardar cookies y sesión
+	DataDir string // Directory to save cookies and session
 }
 
-// New crea una nueva instancia del gestor del navegador
+// New creates a new browser manager instance
 func New(userDataDir string, headless bool) *Manager {
-	// Intentamos buscar el navegador del sistema primero (Chrome instalado)
+	// Try to find system browser first (Installed Chrome)
 	path, _ := launcher.LookPath()
 
-	// Configuramos el lanzador
+	// Configure launcher
 	l := launcher.New().
-		UserDataDir(userDataDir). // Persistencia de sesión
+		UserDataDir(userDataDir). // Session persistence
 		Headless(headless).
 		Set("lang", "en-US"). // Force English locale
 		Devtools(false).
-		Set("disable-blink-features", "AutomationControlled"). // Ocultar que es un bot
-		Set("exclude-switches", "enable-automation").          // Evita la barra "Chrome is being controlled..."
-		Set("use-automation-extension", "false")               // Desactiva extensión de automatización
+		Set("disable-blink-features", "AutomationControlled"). // Hide bot status
+		Set("exclude-switches", "enable-automation").          // Avoids "Chrome is being controlled..." bar
+		Set("use-automation-extension", "false")               // Disable automation extension
 
 	if path != "" {
 		logger.Debug(i18n.T("browser_system"), path)
 		l = l.Bin(path)
 	}
 
-	// Si no es headless (modo login), aseguramos que la ventana sea visible
+	// If not headless (login mode), ensure window is visible
 	if !headless {
 		l = l.Set("start-maximized")
 	}
 
-	// Lanzamos el navegador
+	// Launch browser
 	url, err := l.Launch()
 	if err != nil {
-		// Si falla, intentamos buscar el ejecutable del sistema o descargarlo
+		// If failed, try to find system executable or download it
 		logger.Info(i18n.T("browser_download_fail"))
-		// Recreamos el launcher básico para descargar
+		// Recreate basic launcher to download
 		l = launcher.New().
 			UserDataDir(userDataDir).
 			Headless(headless).
@@ -73,7 +73,7 @@ func New(userDataDir string, headless bool) *Manager {
 		url = l.MustLaunch()
 	}
 
-	// Conectamos Go-Rod al navegador
+	// Connect Go-Rod to browser
 	browser := rod.New().ControlURL(url).MustConnect()
 
 	// 🕵️♂️ HIJACKER: Enforce English (hl=en) on all Takeout requests
@@ -109,18 +109,18 @@ func New(userDataDir string, headless bool) *Manager {
 	}
 }
 
-// Close cierra el navegador
+// Close closes the browser
 func (m *Manager) Close() {
 	if m.Browser != nil {
 		m.Browser.MustClose()
 	}
 }
 
-// ManualLogin abre una página y espera a que el usuario cierre el navegador
-// Esto permite al usuario interactuar libremente para loguearse
+// ManualLogin opens a page and waits for user to close browser
+// This allows user to interact freely to log in
 func (m *Manager) ManualLogin() {
-	// Navegar primero a Google home para "calentar" la sesión
-	// Sin stealth, usamos el navegador tal cual (confiando en las flags y en que es el binario del sistema)
+	// Navigate to Google home first to "warm up" session
+	// Without stealth, use browser as is (trusting flags and system binary)
 	page := m.Browser.MustPage(URLGoogleHome)
 
 	page.MustNavigate(URLGoogleLogin)
@@ -128,9 +128,9 @@ func (m *Manager) ManualLogin() {
 	fmt.Println(i18n.T("browser_nav_open"))
 	fmt.Println(i18n.T("browser_nav_close"))
 
-	page.MustWaitOpen() // Espera a que la página se cargue
+	page.MustWaitOpen() // Wait for page to load
 
-	// Bloquea la ejecución hasta que se cierre el navegador
+	// Block execution until browser is closed
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -141,21 +141,21 @@ func (m *Manager) ManualLogin() {
 	}
 }
 
-// VerifySession comprueba si las cookies actuales permiten acceder a Google Photos
+// VerifySession checks if current cookies allow access to Google Photos
 func (m *Manager) VerifySession() bool {
 	fmt.Println(i18n.T("verifying_session"))
-	// Vamos a photos.google.com
+	// Go to photos.google.com
 	page := m.Browser.MustPage(URLGooglePhotos)
 
-	// Esperamos a que la página se estabilice (redirecciones, carga de scripts)
-	// Usamos MustWaitLoad con timeout porque MustWaitStable se cuelga con el tráfico de fondo de Google Photos
+	// Wait for page to stabilize (redirects, scripts loading)
+	// Use MustWaitLoad with timeout because MustWaitStable hangs with Google Photos background traffic
 	page.Timeout(15 * time.Second).MustWaitLoad()
 
-	// Obtenemos la URL final
+	// Get final URL
 	url := page.MustInfo().URL
 
-	// Si la URL sigue siendo photos.google.com, estamos logueados.
-	// Si nos redirige a accounts.google.com o about.google, falló.
+	// If URL is still photos.google.com, we are logged in.
+	// If redirected to accounts.google.com or about.google, failed.
 	return strings.Contains(url, "photos.google.com")
 }
 
@@ -166,27 +166,27 @@ func (m *Manager) RequestTakeout(mode string) error {
 	logger.Debug("🚀 Requesting new export (Mode: %s)...", mode)
 
 	logger.Debug(i18n.T("navigating_takeout"))
-	// Forzamos el idioma inglés (hl=en) para que los selectores por aria-label funcionen siempre
+	// Force English (hl=en) so aria-label selectors always work
 	page := m.Browser.MustPage(URLTakeoutSettings)
 	page.MustWaitLoad()
 
-	// Esperar a que el botón "Deselect all" esté visible y hacer clic
+	// Wait for "Deselect all" button to be visible and click
 	logger.Debug(i18n.T("deselecting_products"))
-	// Usamos selectores robustos basados en atributos que Google usa internamente
+	// Use robust selectors based on attributes Google uses internally
 	page.MustElement(`[aria-label="Deselect all"]`).MustClick()
-	time.Sleep(1 * time.Second) // Pequeña pausa para que la UI reaccione
+	time.Sleep(1 * time.Second) // Small pause for UI reaction
 
-	// Seleccionar solo Google Photos
+	// Select only Google Photos
 	logger.Debug(i18n.T("selecting_photos"))
 
-	// Estrategia robusta: Usamos XPath para buscar el texto EXACTO "Google Photos".
-	// normalize-space() elimina espacios extra y evita coincidencias parciales en descripciones de otros productos.
+	// Robust strategy: Use XPath to find EXACT text "Google Photos".
+	// normalize-space() removes extra spaces and avoids partial matches in other product descriptions.
 	productLabel := page.MustElementX(`//div[normalize-space(text())="Google Photos"]`)
 
-	// Subimos niveles hasta encontrar el contenedor del producto que tiene el checkbox
+	// Go up levels to find product container with checkbox
 	found := false
 	parent := productLabel
-	for i := 0; i < 10; i++ { // Intentamos hasta 10 niveles hacia arriba
+	for i := 0; i < 10; i++ { // Try up to 10 levels up
 		var err error
 		parent, err = parent.Parent()
 		if err != nil {
@@ -202,23 +202,23 @@ func (m *Manager) RequestTakeout(mode string) error {
 		return fmt.Errorf("no se pudo encontrar el checkbox de Google Photos")
 	}
 
-	// Ir al siguiente paso
+	// Go to next step
 	logger.Debug(i18n.T("next_step"))
 	page.MustElement(`button[aria-label="Next step"]`).MustClick()
 
-	// Esperar a que la sección de creación de exportación cargue
+	// Wait for export creation section to load
 	page.MustWaitLoad()
 
-	// Seleccionar 50GB para reducir número de archivos (menos ZIPs que descargar)
+	// Select 50GB to reduce file count (fewer ZIPs to return)
 	logger.Debug(i18n.T("config_size"))
-	// Abrir menú de tamaño
+	// Open size menu
 	page.MustElement(`div[aria-label="File size select"]`).MustClick()
 	time.Sleep(500 * time.Millisecond)
-	// Seleccionar opción de 50 GB
+	// Select 50 GB option
 	page.MustElementR("li", "50 GB").MustClick()
 	time.Sleep(500 * time.Millisecond)
 
-	// Crear la exportación
+	// Create export
 	logger.Debug(i18n.T("creating_export"))
 
 	// Setup navigation wait BEFORE clicking to avoid race condition
@@ -232,7 +232,7 @@ func (m *Manager) RequestTakeout(mode string) error {
 	// Ensure we are on the Manage page
 	// Sometimes it redirects to /settings/takeout/custom/..., then eventually to /manage
 	// We'll wait for the URL to contain "manage"
-	logger.Debug("Waiting for redirect to Manage page...")
+	logger.Debug(i18n.T("browser_wait_redirect"))
 	err := page.WaitElementsMoreThan(`div[data-in-progress="true"], button[aria-label="Cancel export"]`, 0)
 	// Or just wait for URL
 	if err != nil {
@@ -249,7 +249,7 @@ func (m *Manager) RequestTakeout(mode string) error {
 	return nil
 }
 
-// ExportStatus representa el estado de una exportación en Takeout
+// ExportStatus represents the status of an export in Takeout
 type ExportStatus struct {
 	InProgress    bool
 	Completed     bool
@@ -257,10 +257,10 @@ type ExportStatus struct {
 	CreateTime    time.Time
 	CreatedAt     time.Time
 	ID            string
-	StatusText    string // Texto crudo del estado (ej: "Completo", "Cancelado")
+	StatusText    string // Raw status text (e.g., "Complete", "Cancelled")
 }
 
-// CheckExportStatus comprueba si hay exportaciones activas o listas para descargar
+// CheckExportStatus checks if there are active exports or exports ready to download
 func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	fmt.Println(i18n.T("checking_status"))
 	page := m.Browser.MustPage(URLTakeoutManage)
@@ -268,11 +268,11 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 
 	var statuses []ExportStatus
 
-	// 1. Comprobar si hay exportación en curso
+	// 1. Check if export in progress
 	// Strategy A: data-in-progress attribute (official/clean way)
 	if elements, err := page.Elements(`div[data-in-progress="true"]`); err == nil && len(elements) > 0 {
 		for _, el := range elements {
-			// Verificar si es de Google Photos
+			// Verify if it is Google Photos
 			text, _ := el.Text()
 			if strings.Contains(text, "Google Photos") {
 				current := ExportStatus{InProgress: true}
@@ -282,7 +282,7 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 					current.ID = *attr
 				}
 
-				// Intentar extraer la fecha de creación dentro del elemento de progreso
+				// Try to extract creation date from progress element
 				if createdEl, err := el.ElementR("div", "Created:"); err == nil {
 					text, _ := createdEl.Text()
 					if idx := strings.Index(text, "Created:"); idx != -1 {
@@ -308,29 +308,29 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	// Strategy B: Fallback - Look for "Cancel export" buttons (UI way)
 	// If Strategy A found nothing, this catches cases where attributes changed
 	if len(statuses) == 0 {
-		// Buscamos botones de cancelar, que solo aparecen en exportaciones activas
+		// Look for cancel buttons, which only appear on active exports
 		cancelButtons, err := page.Elements(`button[aria-label="Cancel export"]`)
 		if err == nil && len(cancelButtons) > 0 {
-			// Hay al menos una en progreso. Intentamos deducir si es de Google Photos.
-			logger.Info("⚠️  Detected 'Cancel export' button. Assuming export in progress.")
+			// At least one in progress. Try to deduce if it is Google Photos.
+			logger.Info(i18n.T("browser_detect_cancel"))
 			statuses = append(statuses, ExportStatus{InProgress: true, ID: "unknown-pending"})
 		} else {
-			// Texto plano como último recurso (English ONLY)
+			// Plain text as last resort (English ONLY)
 			bodyText, _ := page.Element("body")
 			text, _ := bodyText.Text()
 			if strings.Contains(text, "being prepared") || strings.Contains(text, "Export in progress") {
-				logger.Info("⚠️  Detected in-progress text on page. Waiting.")
+				logger.Info(i18n.T("browser_detect_text"))
 				statuses = append(statuses, ExportStatus{InProgress: true, ID: "unknown-pending"})
 			}
 		}
 	}
 
-	// 2. Iterar sobre la lista de exportaciones pasadas (Completadas, Canceladas, etc.)
-	// Buscamos la lista ul[jsname="archivelist"] y sus elementos li
+	// 2. Iterate over past exports list (Completed, Cancelled, etc.)
+	// Look for ul[jsname="archivelist"] and its li elements
 	if list, err := page.Element(`ul[jsname="archivelist"]`); err == nil {
 		items, _ := list.Elements("li")
 		for _, item := range items {
-			// Verificar si es de Google Photos
+			// Verify if it is Google Photos
 			text, _ := item.Text()
 			if !strings.Contains(text, "Google Photos") {
 				continue
@@ -338,7 +338,7 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 
 			var st ExportStatus
 
-			// Extraer ID del enlace
+			// Extract ID from link
 			// <a href="./manage/archive/ID_AQUI" ...>
 			if link, err := item.Element("a"); err == nil {
 				href, _ := link.Attribute("href")
@@ -350,9 +350,9 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 				}
 			}
 
-			// Extraer Estado (Texto visible)
+			// Extract Status (Visible text)
 			// <p class="BXHFQ">Completo</p> o <p class="BXHFQ">Cancelado</p>
-			// Nota: Al forzar ?hl=en, esperamos "Complete", "Cancelled", etc.
+			// Note: By forcing ?hl=en, we expect "Complete", "Cancelled", etc.
 			if statusEl, err := item.Element(`p.BXHFQ`); err == nil {
 				text, _ := statusEl.Text()
 				st.StatusText = text
@@ -361,7 +361,7 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 				}
 			}
 
-			// TODO: Extraer fecha de creación si es necesario (está en un div dentro del li)
+			// TODO: Extract creation date if necessary (it's in a div inside li)
 
 			statuses = append(statuses, st)
 		}
@@ -370,13 +370,13 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	return statuses, nil
 }
 
-// CancelExport cancela una exportación en curso
+// CancelExport cancels an in-progress export
 func (m *Manager) CancelExport() error {
 	fmt.Println(i18n.T("cancelling_stale"))
 	page := m.Browser.MustPage(URLTakeoutManage)
 	page.MustWaitLoad()
 
-	// Buscar botón "Cancel export"
+	// Search "Cancel export" button
 	// HTML: <button ... aria-label="Cancel export..."><span ...>Cancel export</span></button>
 	btn, err := page.ElementR("button", "Cancel export")
 	if err != nil {
@@ -384,7 +384,7 @@ func (m *Manager) CancelExport() error {
 	}
 
 	btn.MustClick()
-	time.Sleep(2 * time.Second) // Esperar a que la UI se actualice
+	time.Sleep(2 * time.Second) // Wait for UI update
 	logger.Info(i18n.T("cancel_sent"))
 	return nil
 }
@@ -430,8 +430,8 @@ func (m *Manager) GetDownloadList(id string) ([]registry.DownloadFile, error) {
 			continue
 		}
 
-		// Determinar número de parte basado en el orden de aparición de enlaces válidos
-		// Esto asume que aparecen en orden 1..N
+		// Determine part number based on appearance order of valid links
+		// This assumes they appear in order 1..N
 		partNum := len(files) + 1
 
 		f := registry.DownloadFile{
@@ -453,17 +453,17 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 	logger.Debug("⏳ Navigating to: %s", url)
 
 	page := m.Browser.MustPage(url)
-	fmt.Println("⏳ Waiting for page content...")
+	fmt.Println(i18n.T("browser_waiting_content"))
 	container := page.MustElement(`[data-export-type]`)
 
 	// Check for Quota Exceeded directly on the container attribute
-	fmt.Println("🔍 Checking for quota limit...")
+	fmt.Println(i18n.T("browser_check_quota"))
 	if val, err := container.Attribute("data-download-quota-exceeded"); err == nil && val != nil && *val == "true" {
 		return ErrQuotaExceeded
 	}
 
 	// 1. Identification
-	fmt.Println("🔍 Identifying pending files...")
+	fmt.Println(i18n.T("browser_identify_pending"))
 	var pendingIndices []int
 	for i, f := range files {
 		if f.Status != "completed" {
@@ -476,10 +476,10 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 	}
 
 	if len(pendingIndices) == 0 {
-		logger.Info("✅ No pending files to download.")
+		logger.Info(i18n.T("browser_no_pending"))
 		return nil
 	}
-	logger.Info("📋 Found %d pending files. Scraping URLs...", len(pendingIndices))
+	logger.Info(i18n.T("browser_found_pending"), len(pendingIndices))
 
 	// 2. Scrape URLs Upfront (Robustness Fix)
 	// We extract map[PartNumber]URL to allow closing/ignoring the main page later
@@ -495,7 +495,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 	}
 	baseURL, err := urlPkg.Parse(info.URL)
 	if err != nil {
-		fmt.Printf("⚠️  Failed to parse base URL %s: %v\n", info.URL, err)
+		fmt.Printf(i18n.T("browser_parse_url_fail")+"\n", info.URL, err)
 		// Proceed but relative links might fail
 	}
 
@@ -567,7 +567,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 			}
 		}
 	}
-	logger.Debug("📋 Scraped %d valid download links.", len(partMap))
+	logger.Debug(i18n.T("browser_scraped_links"), len(partMap))
 
 	// 3. Setup Channels for Coordination
 	errChan := make(chan error, 1)
@@ -591,7 +591,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 		for idx := range startedFiles {
 			// If file is not completed, we consider it "broken" or "interrupted"
 			if files[idx].Status != "completed" {
-				logger.Info("🧹 Cleaning up incomplete download: %s", files[idx].Filename)
+				logger.Info(i18n.T("browser_cleanup_incomplete"), files[idx].Filename)
 				crPath := filepath.Join(homeDir, "Downloads", files[idx].Filename+".crdownload")
 				os.Remove(crPath)
 			}
@@ -651,10 +651,10 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 					}
 
 					mu.Unlock()
-					fmt.Printf("\n     ... Started: %s\n", e.SuggestedFilename)
+					fmt.Printf(i18n.T("browser_started_file")+"\n", e.SuggestedFilename)
 					updateStatus(idx, files[idx])
 				} else {
-					fmt.Printf("\n⚠️  Unknown download started: %s\n", e.SuggestedFilename)
+					fmt.Printf(i18n.T("browser_unknown_start")+"\n", e.SuggestedFilename)
 				}
 				return false
 			},
@@ -685,7 +685,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 						updateStatus(idx, files[idx])
 						if checkDone() {
-							logger.Info("🏁 All downloads tracked as complete. Waiting 30s for file finalization...")
+							logger.Info(i18n.T("browser_all_tracked"))
 							time.Sleep(30 * time.Second)
 							return true
 						}
@@ -705,7 +705,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 						updateStatus(idx, files[idx])
 						if checkDone() {
-							logger.Info("🏁 Process finished (with some failures). Waiting 10s before closing...")
+							logger.Info(i18n.T("browser_finished_failures"))
 							time.Sleep(10 * time.Second)
 							return true
 						}
@@ -752,7 +752,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 	// 5. Fire Downloads via Button Click (Sequential with Throttling)
 	// We run this in a goroutine so the main thread can block on the done/error channels
 	go func() {
-		logger.Debug("🚀 Firing download requests via Button Click (Robust JS)...")
+		logger.Debug(i18n.T("browser_firing_requests"))
 
 		// Helper to click a file and check for errors (Quota/Modal)
 		clickFileWithCheck := func(fileIdx int) bool {
@@ -770,8 +770,8 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 			if err != nil || !strings.Contains(currentURL, "takeout.google.com/manage/archive") || !strings.Contains(currentURL, "hl=en") {
 				// CHECK FOR AUTH/LOGIN/PASSKEY
 				if strings.Contains(currentURL, "accounts.google.com") || strings.Contains(currentURL, "signin") {
-					logger.Info("🔐 Auth/Passkey challenge detected! Waiting for user interaction...")
-					logger.Info("👉 Please complete the authentication in the browser window.")
+					logger.Info(i18n.T("browser_auth_challenge"))
+					logger.Info(i18n.T("browser_auth_instruction"))
 
 					// Wait up to 10 minutes for user to solve
 					authTimeout := time.After(10 * time.Minute)
@@ -780,12 +780,12 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 					for !authResolved {
 						select {
 						case <-authTimeout:
-							logger.Error("❌ Auth wait timed out.")
+							logger.Error(i18n.T("browser_auth_timeout"))
 							authResolved = true // Break loop, will likely fail next check
 						case <-ticker.C:
 							if info, err := page.Info(); err == nil {
 								if strings.Contains(info.URL, "takeout.google.com/manage/archive") {
-									logger.Info("✅ Auth resolved! Resuming...")
+									logger.Info(i18n.T("browser_auth_resolved"))
 									authResolved = true
 								}
 							}
@@ -847,7 +847,7 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 			res, err := page.Eval(jsScript)
 			if err != nil {
-				fmt.Printf("❌ JS Execution failed for part %d: %v\n", pNum, err)
+				fmt.Printf(i18n.T("browser_js_fail")+"\n", pNum, err)
 				return false
 			}
 
@@ -1118,7 +1118,7 @@ func (m *Manager) handleAuth(password string) {
 	// Ideally check current page.
 	page := m.Browser.MustPages().First()
 	if el, err := page.Element(`input[type="password"]`); err == nil {
-		fmt.Println("🔑 Auth prompt detected. Attempting to enter password...")
+		fmt.Println(i18n.T("browser_auth_prompt"))
 		el.MustInput(password)
 		time.Sleep(500 * time.Millisecond)
 		// Send Enter key

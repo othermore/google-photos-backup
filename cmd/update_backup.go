@@ -339,6 +339,60 @@ var updateBackupCmd = &cobra.Command{
 			return
 		}
 
+		// 3. Update Immich Master (if enabled)
+		immichEnabled := config.AppConfig.ImmichMasterEnabled
+		if !immichEnabled {
+			immichEnabled = viper.GetBool("immich_master_enabled")
+		}
+
+		immichCount := 0
+		if immichEnabled && !dryRun {
+			immichPath := config.AppConfig.ImmichMasterPath
+			if immichPath == "" {
+				immichPath = viper.GetString("immich_master_path")
+			}
+			logger.Info("📸 Updating Immich Master Directory (%s)...", immichPath)
+
+			for _, relPath := range totalStats.Files {
+				// We need the full path in the SNAPSHOT
+				srcPath := filepath.Join(snapshotDir, relPath)
+
+				// We need the date.
+				// fast way: os.Stat ModTime?
+				// or Exif? The processor.fileIndex might have it!
+				// But totalStats.Files is just a list of strings.
+				// For now, let's use ModTime as fallback, which is what we set in copyFile.
+				// Ideally we should have carried over metadata.
+
+				info, err := os.Stat(srcPath)
+				if err == nil {
+					if err := processor.LinkToImmichMaster(srcPath, backupPath, immichPath, info.ModTime()); err == nil {
+						immichCount++
+					} else {
+						logger.Error("Failed to link to Immich Master: %v", err)
+					}
+				}
+			}
+			// Also need to handle "Linked" files?
+			// If a file was hardlinked from previous backup, it is NEW to this snapshot,
+			// so it might be NEW to Immich Master if we didn't run it before?
+			// But totalStats.Files only tracks Added (Copied/Moved) files?
+			// Let's check struct definition.
+			// Struct: Files []string.
+			// Code: stats.Files = append(stats.Files, relPath) is only in step 3 (Copy/Move).
+			// If we link from previous backup, we don't append to Files.
+
+			// Issue: If we run this for the first time on an incremental backup,
+			// we might miss files that were hardlinked from previous.
+			// User requirement: "Cada vez que se cree un nuevo snapshot ... se deben añadir los ficheros nuevos".
+			// Technically 'Linked' files are part of this snapshot.
+			// But for Immich Master, if they were in Previous Backup, they *should* already be in Immich Master (if feature was on).
+			// If feature was OFF and turned ON, user should run "rebuild-immich-master".
+			// So processing only 'Added' files is likely correct for incremental updates.
+			// HOWEVER, if I re-download an album, files might be 'Linked' from internal or previous.
+			// Let's stick to 'Added' for now to avoid re-scanning chaos, relying on 'rebuild' for full sync.
+		}
+
 		// Logging
 		if !dryRun {
 			logEntry := BackupLogEntry{
@@ -370,6 +424,9 @@ var updateBackupCmd = &cobra.Command{
 		logger.Info(i18n.T("update_backup_success"), totalStats.Added, formatSizeForBackup(totalStats.Bytes), totalStats.Linked, rootSource)
 		logger.Info(i18n.T("update_backup_summary_links"), totalStats.Linked)
 		logger.Info(i18n.T("update_backup_summary_internal"), totalStats.Internal)
+		if immichEnabled && !dryRun {
+			logger.Info("📸 Immich Master: %d files linked", immichCount)
+		}
 		logger.Info(i18n.T("update_backup_summary_exports"), processedExportsCount)
 	},
 }
