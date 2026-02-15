@@ -163,8 +163,22 @@ var fixHardlinksCmd = &cobra.Command{
 }
 
 func isTimestamp(name string) bool {
-	_, err := time.Parse("2006-01-02-150405", name)
-	return err == nil
+	// Expected format: 2006-01-02-150405
+	// Optional suffix: -SomeSuffix
+	const format = "2006-01-02-150405"
+	if len(name) < len(format) {
+		return false
+	}
+	prefix := name[:len(format)]
+	_, err := time.Parse(format, prefix)
+	if err != nil {
+		return false
+	}
+	// If it has extra chars, ensure valid separator or just allow it?
+	// User example: 2024-05-20-173000-FotosGoogleDrive
+	// The timestamp itself has dashes.
+	// So just verifying the prefix is valid is enough to ensure it's a backup folder.
+	return true
 }
 
 func formatSizeForBackup(bytes int64) string {

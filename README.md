@@ -133,7 +133,7 @@ After processing, this command synchronizes the organized files to your final st
 ```
 
 **Features:**
-*   **Snapshots:** Creates a timestamped folder for each backup run.
+*   **Snapshots:** Creates a timestamped folder for each backup run (`YYYY-MM-DD-HHMMSS`). **Suffixes are supported** (e.g., `2024-05-20-173000-MyTag`).
 *   **Smart Deduplication:** Checks if files already exist in the *previous backup*. If content matches (Hash check), it creates a **hardlink** instead of copying. This saves massive Space!
 *   **Logging:** Exact details of every operation are saved to `backup_log.jsonl` in the final directory.
 *   **Cleanup:** If successful, deletes the processed files from `working_path` to free up space.

@@ -129,7 +129,7 @@ Tras procesar, este comando sincroniza los archivos organizados con tu ubicació
 ```
 
 **Características:**
-*   **Snapshots:** Crea una carpeta con fecha/hora para cada ejecución.
+*   **Snapshots:** Crea una carpeta con fecha/hora para cada ejecución (`AAAA-MM-DD-HHMMSS`). **Soporta sufijos** (ej. `2024-05-20-173000-MiEtiqueta`).
 *   **Deduplicación Inteligente:** Comprueba si los archivos ya existen en la *copia anterior*. Si el contenido coincide (Hash), crea un **enlace duro (hardlink)** en lugar de copiar. ¡Ahorra mucho espacio!
 *   **Registro (Log):** Guarda detalles exactos de cada operación en `backup_log.jsonl` en el directorio final.
 *   **Limpieza:** Si finaliza con éxito, borra los archivos procesados del `working_path` para liberar espacio.
