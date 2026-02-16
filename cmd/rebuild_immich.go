@@ -9,6 +9,7 @@ import (
 	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/processor"
+	"google-photos-backup/internal/registry"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,9 +37,13 @@ var rebuildImmichCmd = &cobra.Command{
 		if immichPath == "" {
 			immichPath = viper.GetString("immich_master_path")
 		}
+		if immichPath == "" {
+			immichPath = "immich-master"
+		}
+		masterRoot := filepath.Join(backupPath, immichPath)
 
 		logger.Info("📂 Backup Path: %s", backupPath)
-		logger.Info("📸 Immich Master Path: %s", filepath.Join(backupPath, immichPath))
+		logger.Info("📸 Immich Master Path: %s", masterRoot)
 
 		// 1. List Snapshots (Oldest to Newest)
 		entries, err := os.ReadDir(backupPath)
@@ -60,52 +65,50 @@ var rebuildImmichCmd = &cobra.Command{
 			return
 		}
 
+		// 2. Load Master Index
+		masterIndexPath := filepath.Join(masterRoot, "index.json")
+		masterIndex, err := registry.LoadIndex(masterIndexPath)
+		if err != nil {
+			logger.Info("⚠️  Could not load master index (will start fresh): %v", err)
+			masterIndex = registry.NewIndex()
+		}
+		masterHashMap := processor.GetMasterHashMap(masterIndex)
+		logger.Info("Loaded Master Index: %d files known.", len(masterHashMap))
+
+		// 3. Process Snapshots
 		totalFiles := 0
 		processedFiles := 0
-		linkedCount := 0
 
 		for _, snapName := range snapshots {
 			snapPath := filepath.Join(backupPath, snapName)
-			logger.Info("Scanning snapshot: %s", snapName)
+			logger.Info("Processing snapshot: %s", snapName)
 
-			err := filepath.Walk(snapPath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return nil
-				}
-				if info.IsDir() {
-					return nil
-				}
-				// Skip system files
-				if info.Name() == ".DS_Store" {
-					return nil
-				}
-				// Skip log files
-				if filepath.Ext(info.Name()) == ".jsonl" {
-					return nil
-				}
-
-				totalFiles++
-
-				// Link to Master
-				// We use ModTime as the date source.
-				// For more accuracy, we could try to read Exif, but that requires external libs or slow parsing.
-				// Since we set ModTime during backup, it should be reasonably correct (Creation Date).
-				if err := processor.LinkToImmichMaster(path, backupPath, immichPath, info.ModTime()); err == nil {
-					linkedCount++
-				} else {
-					// logger.Error("Failed to link %s: %v", info.Name(), err)
-				}
-				processedFiles++
-				return nil
-			})
+			// A. Ensure Index Exists
+			// We can call EnsureSnapshotIndex directly. It will reuse existing index if valid.
+			idx, err := processor.EnsureSnapshotIndex(snapPath)
 			if err != nil {
-				logger.Error("Error walking snapshot %s: %v", snapName, err)
+				logger.Error("Failed to ensure index for %s: %v", snapName, err)
+				continue
 			}
+
+			// B. Link to Master
+			if err := processor.LinkSnapshotToMaster(snapPath, idx, masterRoot, masterIndex, masterHashMap); err != nil {
+				logger.Error("Failed to link snapshot %s to master: %v", snapName, err)
+			}
+
+			totalFiles += len(idx.Files)
+			processedFiles++
+		}
+
+		// 4. Save Master Index
+		if err := masterIndex.Save(masterIndexPath); err != nil {
+			logger.Error("Failed to save Master Index: %v", err)
+		} else {
+			logger.Info("✅ Master Index Saved (%d entries).", len(masterIndex.Files))
 		}
 
 		logger.Info("✅ Rebuild Complete.")
-		logger.Info("Total Files Scanned: %d", totalFiles)
-		logger.Info("Files Linked/Verified in Master: %d", linkedCount)
+		logger.Info("Total Snapshots Processed: %d", processedFiles)
 	},
 }
 

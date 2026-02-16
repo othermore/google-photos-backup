@@ -341,6 +341,7 @@ var updateBackupCmd = &cobra.Command{
 
 		// 3. Update Immich Master (if enabled)
 		immichEnabled := config.AppConfig.ImmichMasterEnabled
+		// Fallback to viper if not set in struct (legacy/viper overlap)
 		if !immichEnabled {
 			immichEnabled = viper.GetBool("immich_master_enabled")
 		}
@@ -351,46 +352,43 @@ var updateBackupCmd = &cobra.Command{
 			if immichPath == "" {
 				immichPath = viper.GetString("immich_master_path")
 			}
+			if immichPath == "" {
+				immichPath = "immich-master"
+			}
 			logger.Info("📸 Updating Immich Master Directory (%s)...", immichPath)
+			masterRoot := filepath.Join(backupPath, immichPath)
 
-			for _, relPath := range totalStats.Files {
-				// We need the full path in the SNAPSHOT
-				srcPath := filepath.Join(snapshotDir, relPath)
+			// A. Ensure Index for New Snapshot
+			// We scan the WHOLE snapshot to be safe and robust, using Inode optimization.
+			// This covers 'Added', 'Linked', and 'Internal' files uniformly.
+			snapIdx, err := processor.EnsureSnapshotIndex(snapshotDir)
+			if err != nil {
+				logger.Error("Failed to generate index for new snapshot: %v", err)
+			} else {
+				// B. Load Master Index
+				masterIndexPath := filepath.Join(masterRoot, "index.json")
+				masterIndex, err := registry.LoadIndex(masterIndexPath)
+				if err != nil {
+					// logger.Info("⚠️  Could not load master index (will create new): %v", err)
+					masterIndex = registry.NewIndex()
+				}
+				masterHashMap := processor.GetMasterHashMap(masterIndex)
 
-				// We need the date.
-				// fast way: os.Stat ModTime?
-				// or Exif? The processor.fileIndex might have it!
-				// But totalStats.Files is just a list of strings.
-				// For now, let's use ModTime as fallback, which is what we set in copyFile.
-				// Ideally we should have carried over metadata.
+				// C. Link to Master
+				if err := processor.LinkSnapshotToMaster(snapshotDir, snapIdx, masterRoot, masterIndex, masterHashMap); err != nil {
+					logger.Error("Failed to link new snapshot to master: %v", err)
+				} else {
+					// Count how many files we *know* are in master now (just for stats/log)
+					// Actually we can't easily count *newly* linked without modifying return of LinkSnapshotToMaster
+					// But we can just say "Updated".
+					immichCount = len(snapIdx.Files) // Reporting total files tracked for this snapshot
+				}
 
-				info, err := os.Stat(srcPath)
-				if err == nil {
-					if err := processor.LinkToImmichMaster(srcPath, backupPath, immichPath, info.ModTime()); err == nil {
-						immichCount++
-					} else {
-						logger.Error("Failed to link to Immich Master: %v", err)
-					}
+				// D. Save Master Index
+				if err := masterIndex.Save(masterIndexPath); err != nil {
+					logger.Error("Failed to save Master Index: %v", err)
 				}
 			}
-			// Also need to handle "Linked" files?
-			// If a file was hardlinked from previous backup, it is NEW to this snapshot,
-			// so it might be NEW to Immich Master if we didn't run it before?
-			// But totalStats.Files only tracks Added (Copied/Moved) files?
-			// Let's check struct definition.
-			// Struct: Files []string.
-			// Code: stats.Files = append(stats.Files, relPath) is only in step 3 (Copy/Move).
-			// If we link from previous backup, we don't append to Files.
-
-			// Issue: If we run this for the first time on an incremental backup,
-			// we might miss files that were hardlinked from previous.
-			// User requirement: "Cada vez que se cree un nuevo snapshot ... se deben añadir los ficheros nuevos".
-			// Technically 'Linked' files are part of this snapshot.
-			// But for Immich Master, if they were in Previous Backup, they *should* already be in Immich Master (if feature was on).
-			// If feature was OFF and turned ON, user should run "rebuild-immich-master".
-			// So processing only 'Added' files is likely correct for incremental updates.
-			// HOWEVER, if I re-download an album, files might be 'Linked' from internal or previous.
-			// Let's stick to 'Added' for now to avoid re-scanning chaos, relying on 'rebuild' for full sync.
 		}
 
 		// Logging

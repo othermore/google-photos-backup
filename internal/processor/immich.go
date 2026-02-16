@@ -8,111 +8,175 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"google-photos-backup/internal/logger"
+	"google-photos-backup/internal/registry"
 )
 
-// LinkToImmichMaster links a file to the Immich Master directory structure:
-// backupRoot/immichParamPath/YYYY/MM/filename.ext
-func LinkToImmichMaster(srcPath, backupRoot, immichParamPath string, fileDate time.Time) error {
-	if immichParamPath == "" {
-		immichParamPath = "immich-master"
+// EnsureSnapshotIndex scans a snapshot directory, generates a file index with hashes,
+// and saves it to index.json. It optimizes by reusing hashes from an existing index
+// if the Inode and ModTime match.
+func EnsureSnapshotIndex(snapshotPath string) (*registry.Index, error) {
+	indexPath := filepath.Join(snapshotPath, "index.json")
+
+	// 1. Load existing index for optimization
+	existingIndex, err := registry.LoadIndex(indexPath)
+	if err != nil {
+		logger.Error("Failed to load existing index (will rebuild): %v", err)
+		existingIndex = registry.NewIndex()
 	}
 
-	// 1. Determine Destination Directory: YYYY/MM
-	year := fileDate.Format("2006")
-	month := fileDate.Format("01")
-	destDir := filepath.Join(backupRoot, immichParamPath, year, month)
+	newIndex := registry.NewIndex()
+	totalFiles := 0
+	rehashedFiles := 0
 
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return fmt.Errorf("failed to create immich master dir %s: %w", destDir, err)
-	}
-
-	// 2. Determine Destination Filename
-	filename := filepath.Base(srcPath)
-	destPath := filepath.Join(destDir, filename)
-
-	// 3. Check for collisions
-	if info, err := os.Stat(destPath); err == nil {
-		// File exists!
-		// Is it the same file (Hardlinked)?
-		if areHardlinked(srcPath, destPath) {
-			// Already linked, nothing to do.
+	err = filepath.Walk(snapshotPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		// Skip index.json itself
+		if filepath.Base(path) == "index.json" {
+			return nil
+		}
+		// Skip system files
+		if info.Name() == ".DS_Store" || filepath.Ext(info.Name()) == ".jsonl" {
 			return nil
 		}
 
-		// Is it identical content?
-		// Check size first
-		srcInfo, _ := os.Stat(srcPath)
-		if info.Size() == srcInfo.Size() {
-			// Check Hash
-			srcHash, _ := calculateHash(srcPath)
-			destHash, _ := calculateHash(destPath)
-			if srcHash != "" && srcHash == destHash {
-				// Content is identical but not linked.
-				// We should ideally replace dest with hardlink to src to save space?
-				// Yes, let's fix it.
-				if err := os.Remove(destPath); err != nil {
-					return fmt.Errorf("failed to remove duplicate for linking: %w", err)
-				}
-				if err := os.Link(srcPath, destPath); err != nil {
-					return fmt.Errorf("failed to link identical content: %w", err)
-				}
-				logger.Info("🔗 Relinked existing identical file in Immich Master: %s", filename)
-				return nil
+		totalFiles++
+		relPath, _ := filepath.Rel(snapshotPath, path)
+
+		// Get Inode
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		var inode uint64
+		if ok {
+			inode = stat.Ino
+		}
+
+		hash := ""
+		// Inode Optimization check
+		if existingEntry, ok := existingIndex.Get(relPath); ok {
+			// Check if Inode matches (and ModTime/Size for safety)
+			if existingEntry.Inode == inode &&
+				existingEntry.ModTime.Equal(info.ModTime()) &&
+				existingEntry.Size == info.Size() {
+				hash = existingEntry.Hash
 			}
 		}
 
-		// Content is DIFFERENT (collision).
-		// We must verify uniqueness.
-		// Strategy: Append counter suffix _1, _2 until unique.
+		if hash == "" {
+			// Calculate Hash
+			h, err := calculateHash(path)
+			if err != nil {
+				logger.Error("Failed to hash %s: %v", path, err)
+				return nil
+			}
+			hash = h
+			rehashedFiles++
+		}
+
+		newIndex.AddOrUpdate(registry.FileIndexEntry{
+			RelPath: relPath,
+			Hash:    hash,
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+			Inode:   inode,
+		})
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info("Index generated for %s: %d files (%d re-hashed)", filepath.Base(snapshotPath), totalFiles, rehashedFiles)
+
+	// Save Index
+	if err := newIndex.Save(indexPath); err != nil {
+		return nil, fmt.Errorf("failed to save index: %w", err)
+	}
+
+	return newIndex, nil
+}
+
+// LinkSnapshotToMaster integrates a snapshot into the master directory.
+// masterHashMap: Map[Hash] -> RelPath (in master)
+func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, masterRoot string, masterIndex *registry.Index, masterHashMap map[string]string) error {
+
+	for relPath, entry := range snapshotIndex.Files {
+		// 1. Check Deduplication
+		if _, exists := masterHashMap[entry.Hash]; exists {
+			// Already in Master
+			continue
+		}
+
+		// 2. Not in Master: Link it
+		srcPath := filepath.Join(snapshotPath, relPath)
+
+		// Destination: YYYY/MM/Filename
+		year := entry.ModTime.Format("2006")
+		month := entry.ModTime.Format("01")
+		filename := filepath.Base(relPath)
+
+		destDir := filepath.Join(masterRoot, year, month)
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			return err
+		}
+
+		destRelPath := filepath.Join(year, month, filename)
+		destFullPath := filepath.Join(masterRoot, destRelPath)
+
+		// Collision Handling (Same filename, different hash)
+		// Since we checked Hash above, we know this is NEW content.
+		// If file exists, it's a collision.
+		counter := 1
 		ext := filepath.Ext(filename)
 		name := filename[:len(filename)-len(ext)]
-		counter := 1
+
 		for {
-			newFilename := fmt.Sprintf("%s_%d%s", name, counter, ext)
-			destPath = filepath.Join(destDir, newFilename)
-			if _, err := os.Stat(destPath); os.IsNotExist(err) {
+			if _, err := os.Stat(destFullPath); os.IsNotExist(err) {
 				break
 			}
-			// Check if THIS new candidate is the same file? (Unlikely but possible if re-running)
-			if areHardlinked(srcPath, destPath) {
-				return nil
-			}
+			// Collision! Rename.
+			newFilename := fmt.Sprintf("%s_%d%s", name, counter, ext)
+			destRelPath = filepath.Join(year, month, newFilename)
+			destFullPath = filepath.Join(masterRoot, destRelPath)
 			counter++
 		}
-	}
 
-	// 4. Create Hardlink
-	if err := os.Link(srcPath, destPath); err != nil {
-		return fmt.Errorf("failed to link to immich master: %w", err)
+		// Create Hardlink
+		if err := os.Link(srcPath, destFullPath); err != nil {
+			logger.Error("Failed to link to master %s: %v", destRelPath, err)
+			continue
+		}
+
+		// Update Master Index & Hash Map
+		// Get Inode of the new link
+		var inode uint64
+		if info, err := os.Stat(destFullPath); err == nil {
+			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+				inode = stat.Ino
+			}
+		}
+
+		newEntry := registry.FileIndexEntry{
+			RelPath: destRelPath,
+			Hash:    entry.Hash,
+			Size:    entry.Size,
+			ModTime: entry.ModTime,
+			Inode:   inode,
+		}
+		masterIndex.AddOrUpdate(newEntry)
+		masterHashMap[entry.Hash] = destRelPath
 	}
-	// logger.Info("📸 Linked to Immich Master: %s/%s/%s", year, month, filepath.Base(destPath))
 	return nil
 }
 
-// Helpers (Duplicated from other packages to keep processor independent if needed,
-// or should use shared utils? processor package is fine provided imports allow).
-
-func areHardlinked(p1, p2 string) bool {
-	fi1, err := os.Stat(p1)
-	if err != nil {
-		return false
-	}
-	fi2, err := os.Stat(p2)
-	if err != nil {
-		return false
-	}
-
-	stat1, ok1 := fi1.Sys().(*syscall.Stat_t)
-	stat2, ok2 := fi2.Sys().(*syscall.Stat_t)
-	if !ok1 || !ok2 {
-		return false
-	}
-
-	return stat1.Ino == stat2.Ino && stat1.Dev == stat2.Dev
-}
+// Helpers
 
 func calculateHash(filePath string) (string, error) {
 	file, err := os.Open(filePath)
@@ -126,4 +190,12 @@ func calculateHash(filePath string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func GetMasterHashMap(idx *registry.Index) map[string]string {
+	m := make(map[string]string)
+	for path, entry := range idx.Files {
+		m[entry.Hash] = path
+	}
+	return m
 }

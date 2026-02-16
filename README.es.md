@@ -152,7 +152,12 @@ Escanea tus snapshots antiguos o modificados manualmente para maximizar el ahorr
 
 ### 5. Directorio Maestro para Immich (Opcional)
 
-Puedes mantener una estructura de directorios aplanada y deduplicada, optimizada para **Immich** (o cualquier biblioteca externa). Esta carpeta organiza todas tus fotos por Año/Mes usando enlaces duros (hardlinks), por lo que **no ocupa espacio adicional**.
+Puedes mantener una estructura de directorios aplanada y deduplicada, optimizada para **Immich** (o cualquier biblioteca externa). Esta carpeta organiza todas tus fotos por Año/Mes usando **solo enlaces duros (hardlinks)**.
+
+**Características Clave:**
+*   **Cero Espacio:** Los archivos son hardlinks a tus snapshots. No se crean copias físicas.
+*   **Basado en Índices:** Utiliza archivos `index.json` eficientes para rastrear el contenido y evitar escaneos redundantes.
+*   **Auto-Actualización:** `update-backup` indexa automáticamente los nuevos snapshots y los enlaza al directorio maestro.
 
 **Configuración (en `config.yaml`):**
 ```yaml
@@ -160,13 +165,23 @@ immich_master_enabled: true
 immich_master_path: "immich-master" # relativo a backup_path
 ```
 
-**Características:**
-*   **Auto-Actualización:** Al ejecutar `update-backup`, las nuevas fotos se enlazan automáticamente al directorio maestro.
-*   **Estructura:** `immich-master/AAAA/MM/foto.jpg`.
-*   **Reconstrucción (Rebuild):** Puedes generar este directorio desde tus snapshots existentes en cualquier momento:
+**Comandos:**
+
+*   **Reconstruir Maestro:**
+    Si habilitas esta función más tarde o cambias la ruta, puedes regenerar el directorio maestro desde todos los snapshots existentes:
     ```bash
     ./gpb rebuild-immich-master
     ```
+
+### 6. Reconstruir Índices (Mantenimiento)
+
+Si necesitas regenerar los archivos `index.json` de tus snapshots (ej. tras cambios manuales o para una deduplicación fresca):
+
+```bash
+./gpb rebuild-index
+```
+*   **Optimizado:** Utiliza el rastreo de Inodos para acelerar la re-indexación de archivos sin cambios.
+
 
 ## Solución de Problemas
 

@@ -156,7 +156,12 @@ Scans your legacy or manually modified backup snapshots to maximize space saving
 
 ### 5. Immich Master Directory (Optional)
 
-You can maintain a flattened, deduplicated directory structure optimized for **Immich** (or any external library). This folder organizes all your photos by Year/Month using hardlinks, so it takes **zero additional space**.
+You can maintain a flattened, deduplicated directory structure optimized for **Immich** (or any external library). This folder organizes all your photos by Year/Month using **hardlinks only**.
+
+**Key Features:**
+*   **Zero Space:** Files are hardlinked to your snapshots. No physical copies are made.
+*   **Index-Based:** Uses efficient `index.json` files to track content and avoid redundant scanning.
+*   **Auto-Update:** `update-backup` automatically indexes new snapshots and links them to the master directory.
 
 **Configuration (in `config.yaml`):**
 ```yaml
@@ -164,13 +169,23 @@ immich_master_enabled: true
 immich_master_path: "immich-master" # relative to backup_path
 ```
 
-**Features:**
-*   **Auto-Update:** When running `update-backup`, new photos are automatically linked to the master directory.
-*   **Structure:** `immich-master/YYYY/MM/photo.jpg`.
-*   **Rebuild:** You can generate this directory from your existing snapshots at any time:
+**Commands:**
+
+*   **Rebuild Master:**
+    If you enable this feature later or change the path, you can regenerate the master directory from all existing snapshots:
     ```bash
     ./gpb rebuild-immich-master
     ```
+
+### 6. Rebuild Indexes (Maintenance)
+
+If you need to regenerate the `index.json` files for your snapshots (e.g., after manual changes or for fresh deduplication):
+
+```bash
+./gpb rebuild-index
+```
+*   **Optimized:** Uses Inode tracking to speed up re-indexing of unchanged files.
+
 
 ### How it Works
 
