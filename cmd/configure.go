@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -115,6 +116,8 @@ func loginFlow(workingPath string) {
 	// Headless = false para que el usuario pueda ver y escribir
 	bm := browser.New(userDataDir, false)
 	bm.ManualLogin()
+	bm.Close()                  // Close specifically to release the User Data Dir lock
+	time.Sleep(2 * time.Second) // Wait for process to exit and lock to be released
 
 	// Verificación Headless inmediata
 	logger.Info(i18n.T("validating_creds"))

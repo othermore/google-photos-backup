@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"strings"
+
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/registry"
 )
@@ -114,6 +116,11 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 			continue
 		}
 
+		// Check ignored extensions
+		if IsIgnoredFile(relPath) {
+			continue
+		}
+
 		// 2. Not in Master: Link it
 		srcPath := filepath.Join(snapshotPath, relPath)
 
@@ -198,4 +205,20 @@ func GetMasterHashMap(idx *registry.Index) map[string]string {
 		m[entry.Hash] = path
 	}
 	return m
+}
+
+// IsIgnoredFile checks if a file should be excluded from Immich Master
+func IsIgnoredFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".json", ".zip", ".tar", ".tgz", ".rar", ".ini", ".lnk", ".docx", ".txt", ".html":
+		return true
+	case ".crdownload", ".tmp":
+		return true
+	}
+	// Also ignore system files starting with .
+	if strings.HasPrefix(filepath.Base(filename), ".") {
+		return true
+	}
+	return false
 }

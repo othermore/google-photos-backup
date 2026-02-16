@@ -135,7 +135,11 @@ func (m *Manager) ManualLogin() {
 	defer ticker.Stop()
 	for {
 		<-ticker.C
-		if _, err := m.Browser.Pages(); err != nil {
+		pages, err := m.Browser.Pages()
+		if err != nil {
+			break
+		}
+		if len(pages) == 0 {
 			break
 		}
 	}

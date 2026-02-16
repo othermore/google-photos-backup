@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +11,7 @@ import (
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
+	"google-photos-backup/internal/registry"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,10 +19,10 @@ import (
 
 var fixHardlinksCmd = &cobra.Command{
 	Use:   "fix-hardlinks",
-	Short: "Deduplicate final backup by hardlinking identical files",
-	Long:  `Scans the final backup directory (containing timestamped snapshots) and replaces identical files across snapshots with hardlinks to save space.`,
+	Short: "Deduplicate final backup using index.json",
+	Long:  `Scans the final backup directory (containing timestamped snapshots) and utilizes the existing index.json files to identify and hardlink duplicate files across snapshots instantly.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		logger.Info("Starting Fix Hardlinks...")
+		logger.Info("Starting Fix Hardlinks (Index-Based)...")
 
 		backupPath := config.AppConfig.BackupPath
 		if backupPath == "" {
@@ -56,106 +54,112 @@ var fixHardlinksCmd = &cobra.Command{
 				snapshots = append(snapshots, e.Name())
 			}
 		}
-		sort.Strings(snapshots) // Chronological
+		sort.Strings(snapshots) // Chronological order is crucial
 
-		if len(snapshots) < 2 {
+		if len(snapshots) < 1 {
 			logger.Info(i18n.T("fix_hardlinks_not_enough"))
 			return
 		}
 
 		// 2. Global Index: Map[Hash] -> OriginalPath
-		// We only store the FIRST occurrence of a file content.
-		fileIndex := make(map[string]string)
+		// We track the FIRST occurrence of a file content.
+		globalIndex := make(map[string]string)
 
 		// Stats
 		totalFiles := 0
 		dedupedCount := 0
 		savedBytes := int64(0)
-
-		// For progress reporting
-		processedFiles := 0
+		snapshotsProcessed := 0
 
 		for _, snapName := range snapshots {
 			snapPath := filepath.Join(backupPath, snapName)
-			logger.Info(i18n.T("fix_hardlinks_analyze"), snapName)
+			indexPath := filepath.Join(snapPath, "index.json")
 
-			err := filepath.Walk(snapPath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return nil
-				}
-				if info.IsDir() {
-					return nil
-				}
+			// Check if index exists
+			if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+				logger.Info("⚠️  Snapshot %s has no index.json. Skipping. Run 'rebuild-index' first.", snapName)
+				continue
+			}
 
+			logger.Info("🔍 Analyzing snapshot: %s", snapName)
+
+			// Load Index
+			idx, err := registry.LoadIndex(indexPath)
+			if err != nil {
+				logger.Error("Failed to load index for %s: %v", snapName, err)
+				continue
+			}
+
+			snapTotal := 0
+			snapDedup := 0
+
+			// Iterate files in index
+			for relPath, fileData := range idx.Files {
+				fullPath := filepath.Join(snapPath, relPath)
+				snapTotal++
 				totalFiles++
 
-				// Calculate Hash
-				// Optimization: Use Size+ModTime as key? User asked for Hash.
-				// Compromise: Hash is safest. But slow.
-				// Let's use Size + Partial Hash?
-				// User explicitly said: "detectar que es una copia con el mismo hash".
+				// Check if Hash is already known
+				if originalPath, found := globalIndex[fileData.Hash]; found {
+					// Duplicate content candidate!
 
-				// Check if we can skip hashing (already hardlinked to something we know?)
-				// If inode is already seen?
-				// But we track by Content. Inode tracking is useful if we see internal hardlinks.
-
-				hash, err := calculateHash(path)
-				if err != nil {
-					logger.Error("Failed to hash %s: %v", path, err)
-					return nil
-				}
-
-				// Check if exists in index
-				if originalPath, found := fileIndex[hash]; found {
-					// Duplicate content found!
-
-					// Check if ALREADY hardlinked
-					if areHardlinked(originalPath, path) {
-						// Already optimized.
-						return nil
+					// 1. Check if it's the SAME file (e.g. self-reference or same path)
+					if originalPath == fullPath {
+						continue
 					}
 
-					// Not hardlinked. Fix it.
+					// 2. Check if already hardlinked (Inode check)
+					// We need to stat the current file to check Inode
+					if areHardlinked(originalPath, fullPath) {
+						// Already optimized.
+						continue
+					}
+
+					// 3. Not hardlinked. Fix it.
 					if !dryRun {
 						// Remove duplicate
-						if err := os.Remove(path); err != nil {
-							logger.Error("Failed to remove duplicate %s: %v", path, err)
-							return nil
+						if err := os.Remove(fullPath); err != nil {
+							// If file doesn't exist (index desync?), skip
+							if !os.IsNotExist(err) {
+								logger.Error("Failed to remove duplicate %s: %v", fullPath, err)
+							}
+							continue
 						}
 						// Link to original
-						if err := os.Link(originalPath, path); err != nil {
-							logger.Error("Failed to link %s -> %s: %v", path, originalPath, err)
-							// Restore? panic?
+						if err := os.Link(originalPath, fullPath); err != nil {
+							logger.Error("Failed to link %s -> %s: %v", fullPath, originalPath, err)
 						} else {
+							snapDedup++
 							dedupedCount++
-							savedBytes += info.Size()
+							savedBytes += fileData.Size
+
+							// Update the index? Content is same, Inode changed.
+							// Ideally we should update the index with the new Inode to avoid re-hashing later.
+							// But that requires saving the index. For now, let's just do the filesystem op.
+							// Next 'rebuild-index' will pick up the new Inode.
 						}
 					} else {
+						snapDedup++
 						dedupedCount++
-						savedBytes += info.Size()
-						logger.Info("Would link: %s -> %s", path, originalPath)
+						savedBytes += fileData.Size
+						// logger.Info("Would link: %s -> %s", fullPath, originalPath)
 					}
 
 				} else {
-					// New unique content. Register it.
-					fileIndex[hash] = path
+					// New unique content. Register it as the "Source of Truth".
+					// We verify it exists before registering, just in case index is stale.
+					if _, err := os.Stat(fullPath); err == nil {
+						globalIndex[fileData.Hash] = fullPath
+					}
 				}
-
-				processedFiles++
-				if processedFiles%1000 == 0 {
-					fmt.Printf("\rProcessed %d files...", processedFiles)
-				}
-
-				return nil
-			})
-
-			if err != nil {
-				logger.Error("Error walking snapshot %s: %v", snapName, err)
 			}
+
+			// logger.Info("   Snapshot stats: %d files, %d deduplicated", snapTotal, snapDedup)
+			snapshotsProcessed++
 		}
 
-		fmt.Println("") // Newline after progress
 		logger.Info(i18n.T("fix_hardlinks_complete"))
+		logger.Info("   Snapshots Scanned: %d", snapshotsProcessed)
 		logger.Info(i18n.T("fix_hardlinks_processed"), totalFiles)
 		logger.Info(i18n.T("fix_hardlinks_linked"), dedupedCount)
 		logger.Info(i18n.T("fix_hardlinks_saved"), formatSizeForBackup(savedBytes))
@@ -163,22 +167,13 @@ var fixHardlinksCmd = &cobra.Command{
 }
 
 func isTimestamp(name string) bool {
-	// Expected format: 2006-01-02-150405
-	// Optional suffix: -SomeSuffix
 	const format = "2006-01-02-150405"
 	if len(name) < len(format) {
 		return false
 	}
 	prefix := name[:len(format)]
 	_, err := time.Parse(format, prefix)
-	if err != nil {
-		return false
-	}
-	// If it has extra chars, ensure valid separator or just allow it?
-	// User example: 2024-05-20-173000-FotosGoogleDrive
-	// The timestamp itself has dashes.
-	// So just verifying the prefix is valid is enough to ensure it's a backup folder.
-	return true
+	return err == nil
 }
 
 func formatSizeForBackup(bytes int64) string {
@@ -199,22 +194,7 @@ func init() {
 	fixHardlinksCmd.Flags().Bool("dry-run", false, "Simulate deduplication")
 }
 
-func calculateHash(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-// areHardlinked is duplicated from dedup.go/update_backup.go but ok for CLI cmd package separation
-// (actually update_backup.go didn't export it, so I copy it here)
+// areHardlinked checks if two files share the same inode and device
 func areHardlinked(p1, p2 string) bool {
 	fi1, err := os.Stat(p1)
 	if err != nil {
