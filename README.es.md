@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> Este proyecto está todavía en desarrollo. No lo uses, o hazlo bajo tu cuenta y riesgo. Espero tener un release inicial a finales de Marzo de 2026.
+
+
 # Google Photos Backup (Linux/macOS)
 
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
@@ -9,18 +13,15 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
 
 ## Características
 
-* **Takeout Automatizado:** Automatiza la solicitud y descarga de copias completas vía Google Takeout.
-* **Calidad Original:** Asegura la descarga de archivos originales con metadatos completos.
-* **Organización Inteligente:** Procesa los archivos descargados para corregir fechas EXIF (usando los JSONs de Google) y organiza fotos en álbumes.
-* **Headless:** Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
-* **Descarga Robusta:**
-    * Reanuda descargas interrumpidas automáticamente.
-    * Maneja errores de "Quota Exceeded" marcando exportaciones como expiradas.
-    * Valida tamaños de archivo antes de marcarlos como completos.
-* **Experiencia de Usuario:**
-    * Dashboard de progreso detallado con Velocidad y Tiempo Restante (ETA).
-    * Opción de salida detallada (`verbose`) para depuración.
-    * Internacionalizado (Inglés/Español).
+* **Tres Modos de Operación:**
+    *   **Sync**: Descarga directa interactiva desde Google Takeout.
+    *   **Schedule + Drive**: Configura exportaciones recurrentes (cada 2 meses) a Drive y las descarga/sincroniza automáticamente usando `rclone`.
+    *   **Import**: Procesa manualmente ZIPs de Takeout existentes.
+*   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
+*   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
+*   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
+*   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (vía sistema `msmtp`).
+*   **Headless**: Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
 
 ## Instalación
 
@@ -32,11 +33,12 @@ cd google-photos-backup
 go build -o gpb main.go
 ```
 
+### Requisitos
+*   **Google Chrome / Chromium**: Para la automatización del navegador (programación/solicitud).
+*   **Rclone**: Requerido para el modo `drive` (descarga desde Google Drive).
+*   **msmtp** (Opcional): Para alertas por correo electrónico.
+
 ## Configuración
-
-La aplicación utiliza un navegador automatizado (Chrome/Chromium). Necesitarás iniciar sesión manualmente la primera vez para guardar la sesión.
-
-### Setup
 
 Ejecuta el asistente de configuración:
 
@@ -44,150 +46,61 @@ Ejecuta el asistente de configuración:
 ./gpb configure
 ```
 
-Sigue las instrucciones. Esto autorizará a la herramienta a acceder a tus datos de Google Takeout.
-
-### Archivo de Configuración
-
-La configuración se almacena en `~/.config/google-photos-backup/config.yaml`.
-
-**Opciones Disponibles:**
-
-| Clave | Valor por Defecto | Descripción |
-| :--- | :--- | :--- |
-| `working_path` | `./work` | Directorio de trabajo para descargas y archivos temporales. |
-| `backup_frequency` | `168h` | Frecuencia para solicitar nuevas copias (ej. `24h`, `168h` = 7 días). |
-| `download_mode` | `directDownload` | Modo de operación. Actualmente solo se soporta `directDownload`. |
-| `fix_ambiguous_metadata` | `interactive` | Comportamiento para coincidencias ambiguas (`yes`, `no`, `interactive`). |
-| `backup_path` | (vacío) | Ruta al destino final de la copia de seguridad (snapshots). |
-| `user_data_dir` | (auto) | Ruta al perfil de usuario de Chrome (no cambiar salvo necesario). |
-
-## Ciclo de Vida de una Exportación
-
-El sistema gestiona el ciclo de vida de cada Takeout mediante estados en `history.json`:
-
-*   **`requested`**: Solicitud iniciada pero no confirmada por Google.
-*   **`in_progress`**: Google está preparando los archivos.
-*   **`ready`**: Archivos listos para descargar.
-*   **`expired`**: La exportación caducó en los servidores de Google.
-*   **`cancelled`**: Cancelada por el usuario o el sistema.
-*   **`failed`**: Google falló al generar la exportación.
-
-### Integridad de Datos
-
-Para asegurar la seguridad y evitar conflictos:
-1.  **`history.json`**: Fuente de la verdad de las exportaciones. Modificado por `sync`, solo lectura para `process`.
-2.  **`state.json`**: Rastrea el progreso de cada ZIP.
-3.  **`processing_index.json`**: Rastrea qué exportaciones y archivos han sido procesados.
+Esto configurará tu:
+*   Directorio de Trabajo (espacio temporal)
+*   Directorio de Backup (almacenamiento final)
+*   Remoto de Rclone (para modo Drive)
+*   Email para alertas
 
 ## Uso
 
-### 1. Sync (Comando Principal)
-
-Comprueba el estado de tus exportaciones y maneja el flujo (Solicitar -> Esperar -> Descargar).
-
-```bash
-./gpb sync [flags]
-```
-
-**Flags:**
-
-* `-v, --verbose`: Activa log detallado de depuración.
-* `--force`: Ignora el chequeo de frecuencia (`backup_frequency`) y fuerza una nueva solicitud inmediatamente.
-
-### 2. Process (Organización)
-
-Una vez descargados los archivos, este comando extrae, corrige metadatos y organiza.
+### 1. Sincronización Interactiva (Sync)
+Ideal para copias puntuales o ejecuciones iniciales. Inicia sesión en Google, solicita una descarga y crea una copia local.
 
 ```bash
-./gpb process [flags]
+./gpb sync
 ```
 
-**Flujo de Trabajo:**
-1.  **Extracción**: Descomprime nuevos archivos encontrados en `downloads/` a un subdirectorio `raw/`.
-2.  **Corrección de Metadatos**: Usa los ficheros JSON de Google para corregir la "Fecha de Modificación" de tus imágenes/videos.
-    *   **Niveles de Coincidencia**:
-        *   **Nivel 1 (Exacto)**: Coincide `archivo.json` o `archivo.supplemental-metadata.json`.
-        *   **Nivel 2 (Limpio)**: Coincide eliminando extensión (ej. `IMG_123.jpg` -> `IMG_123.json`).
-        *   **Nivel 3 (Difuso/Seguro)**: Coincide nombres truncados si la longitud común es **>40 caracteres** (evita que `IMG.json` coincida con `IMG_1234.jpg`).
-    *   **Coincidencias Ambiguas**: Las coincidencias parciales menores de 40 caracteres usan el comportamiento definido por `--fix-ambiguous-metadata`.
-3.  **Deduplicación Global**: Escanea todos los ficheros, identifica duplicados (SHA256) y mantiene la mejor versión. Los duplicados se reemplazan con enlaces simbólicos relativos para ahorrar espacio.
+### 2. Backup Automatizado de Drive (Recomendado)
+Este método es totalmente automatizado y robusto.
 
-**Flags:**
-
-*   `--fix-ambiguous-metadata`: Comportamiento para coincidencias ambiguas (`yes`=aplicar, `no`=saltar, `interactive`=preguntar). Por defecto: `interactive`.
-*   `--force-metadata`: Re-ejecuta la corrección de fechas en exportaciones ya procesadas.
-*   `--force-dedup`: Re-ejecuta la comprobación de duplicados.
-*   `--force-extract`: Re-extrae los archivos comprimidos.
-*   `--export <ID>`: Procesa SOLO el ID de exportación especificado.
-
-### 3. Actualizar Backup (Sincronización Final)
-
-Tras procesar, este comando sincroniza los archivos organizados con tu ubicación de almacenamiento final (ej. NAS, disco externo).
+**Paso A: Programar Exportaciones Recurrentes**
+Ejecuta esto **una vez** para configurar Google Takeout para exportar tus fotos a Drive cada 2 meses durante 1 año.
 
 ```bash
-./gpb update-backup [flags]
+./gpb schedule
 ```
 
-**Características:**
-*   **Snapshots:** Crea una carpeta con fecha/hora para cada ejecución (`AAAA-MM-DD-HHMMSS`). **Soporta sufijos** (ej. `2024-05-20-173000-MiEtiqueta`).
-*   **Deduplicación Inteligente:** Comprueba si los archivos ya existen en la *copia anterior*. Si el contenido coincide (Hash), crea un **enlace duro (hardlink)** en lugar de copiar. ¡Ahorra mucho espacio!
-*   **Registro (Log):** Guarda detalles exactos de cada operación en `backup_log.jsonl` en el directorio final.
-*   **Limpieza:** Si finaliza con éxito, borra los archivos procesados del `working_path` para liberar espacio.
-
-**Flags:**
-*   `--dry-run`: Simula la actualización sin copiar ni borrar nada.
-*   `--source <dir>`: Especifica manualmente el directorio origen (por defecto `working_path/downloads`).
-
-### 4. Fix Hardlinks (Deduplicación)
-
-Escanea tus snapshots antiguos o modificados manualmente para maximizar el ahorro de espacio enlazando archivos idénticos entre copias.
+**Paso B: Sincronización Desatendida de Drive**
+Ejecuta este comando vía **Cron** (ej. diariamente). Revisa tu Drive buscando nuevas exportaciones, las descarga, procesa y borra de Drive para ahorrar espacio en la nube.
 
 ```bash
-./gpb fix-hardlinks [flags]
+./gpb drive
 ```
 
-**Flags:**
-*   `--dry-run`: Simula la deduplicación sin modificar archivos.
-*   `--path <dir>`: Ruta a la raíz del backup (por defecto `backup_path`).
-
-### 5. Directorio Maestro para Immich (Opcional)
-
-Puedes mantener una estructura de directorios aplanada y deduplicada, optimizada para **Immich** (o cualquier biblioteca externa). Esta carpeta organiza todas tus fotos por Año/Mes usando **solo enlaces duros (hardlinks)**.
-
-**Características Clave:**
-*   **Cero Espacio:** Los archivos son hardlinks a tus snapshots. No se crean copias físicas.
-*   **Basado en Índices:** Utiliza archivos `index.json` eficientes para rastrear el contenido y evitar escaneos redundantes.
-*   **Auto-Actualización:** `update-backup` indexa automáticamente los nuevos snapshots y los enlaza al directorio maestro.
-
-**Configuración (en `config.yaml`):**
-```yaml
-immich_master_enabled: true
-immich_master_path: "immich-master" # relativo a backup_path
+**Ejemplo Cron:**
+```bash
+0 3 * * * /path/to/gpb drive >> /var/log/gpb.log 2>&1
 ```
 
-**Comandos:**
-
-*   **Reconstruir Maestro:**
-    Si habilitas esta función más tarde o cambias la ruta, puedes regenerar el directorio maestro desde todos los snapshots existentes:
-    ```bash
-    ./gpb rebuild-immich-master
-    ```
-
-### 6. Reconstruir Índices (Mantenimiento)
-
-Si necesitas regenerar los archivos `index.json` de tus snapshots (ej. tras cambios manuales o para una deduplicación fresca):
+### 3. Importación Manual
+Si has descargado manualmente ZIPs de Takeout, puedes importarlos:
 
 ```bash
-./gpb rebuild-index
+./gpb import /ruta/a/carpeta_con_zips
 ```
-*   **Optimizado:** Utiliza el rastreo de Inodos para acelerar la re-indexación de archivos sin cambios.
 
+## Almacenamiento y Deduplicación
+
+La herramienta organiza los archivos en una estructura `Backup/AAAA/MM`.
+*   **Snapshots**: Cada ejecución puede actualizar la estructura existente o crear snapshots (configurable).
+*   **Hardlinks**: Los archivos idénticos entre copias (o importados múltiples veces) se enlazan mediante hardlinks, sin usar espacio adicional.
 
 ## Solución de Problemas
 
-*   **Problemas de Login:** Si la herramienta se queda atascada verificando la sesión, prueba a ejecutar `./gpb configure` de nuevo.
-*   **"Quota Exceeded":** Si ocurre este error, la herramienta marcará la exportación como expirada y solicitará una nueva.
-*   **Modo Verbose:** Ejecuta con `./gpb sync -v`.
+*   **Login de Google**: Si `schedule` o `sync` se atascan en el login, ejecuta `gpb configure` y elige "Sí" para iniciar sesión interactivamente.
+*   **Rclone**: Asegúrate de que `rclone lsd remote:` funciona antes de ejecutar `gpb drive`.
+*   **Backups Obsoletos**: Si no has hecho copia en >30 días, `gpb drive` intentará enviar una alerta por email si está configurado.
 
 ## Créditos
 
