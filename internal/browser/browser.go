@@ -165,11 +165,9 @@ func (m *Manager) VerifySession() bool {
 
 // RequestTakeout navigates to Takeout and requests a new export
 func (m *Manager) RequestTakeout(mode string) error {
-	// TODO: Use mode to select delivery method (Email vs Drive)
-	// For now, default to Email (Direct Download)
-	logger.Debug("🚀 Requesting new export (Mode: %s)...", mode)
+	logger.Info("🚀 Requesting new export (Mode: %s)...", mode)
 
-	logger.Debug(i18n.T("navigating_takeout"))
+	logger.Info(i18n.T("navigating_takeout"))
 	// Force English (hl=en) so aria-label selectors always work
 	page := m.Browser.MustPage(URLTakeoutSettings)
 	page.MustWaitLoad()
@@ -181,7 +179,7 @@ func (m *Manager) RequestTakeout(mode string) error {
 	time.Sleep(1 * time.Second) // Small pause for UI reaction
 
 	// Select only Google Photos
-	logger.Debug(i18n.T("selecting_photos"))
+	logger.Info(i18n.T("selecting_photos"))
 
 	// Robust strategy: Use XPath to find EXACT text "Google Photos".
 	// normalize-space() removes extra spaces and avoids partial matches in other product descriptions.
@@ -197,7 +195,11 @@ func (m *Manager) RequestTakeout(mode string) error {
 			break
 		}
 		if has, _, _ := parent.Has(`input[type="checkbox"]`); has {
-			parent.MustElement(`input[type="checkbox"]`).MustClick()
+			if _, err := parent.Element(`input[type="checkbox"]:checked`); err == nil {
+				// Already checked
+			} else {
+				parent.MustElement(`input[type="checkbox"]`).MustClick()
+			}
 			found = true
 			break
 		}
@@ -212,10 +214,55 @@ func (m *Manager) RequestTakeout(mode string) error {
 
 	// Wait for export creation section to load
 	page.MustWaitLoad()
+	time.Sleep(1 * time.Second)
+
+	// --- DESTINATION SELECTION ---
+	if mode == "driveDownload" { // config.ModeDriveDownload string value
+		logger.Info("📂 Selecting 'Add to Drive' as destination...")
+
+		// Wait for the dropdown to be visible. It might load async.
+		// Try multiple strategies to find the "Delivery method" dropdown
+		var destMenu *rod.Element
+		var err error
+
+		// Strategy: Click the combobox to open the menu, then select the option.
+		// DOM analysis shows the dropdown is a div with role="combobox" and aria-labelledby="destinationSelectID"
+
+		logger.Info("   - Opening destination menu...")
+		destMenu, err = page.Race().Element(`div[role="combobox"][aria-labelledby="destinationSelectID"]`).Element(`div[role="combobox"]`).Handle(func(e *rod.Element) error {
+			return e.WaitVisible()
+		}).Do()
+
+		if err != nil {
+			logger.Error("❌ Failed to find Destination Dropdown (combobox): %v", err)
+			return fmt.Errorf("failed to select destination: dropdown not found")
+		}
+
+		destMenu.MustClick()
+		time.Sleep(1 * time.Second) // Wait for menu animation
+
+		// Select "Add to Drive" option
+		// The options are in a ul[role="listbox"] -> li[data-value="DRIVE"]
+		logger.Info("   - Clicking 'Add to Drive' option...")
+
+		// Wait for the option to appear in the DOM and be visible
+		driveOption, err := page.Race().Element(`li[data-value="DRIVE"]`).ElementX(`//span[contains(text(), "Add to Drive")]/ancestor::li`).Handle(func(e *rod.Element) error {
+			return e.WaitVisible()
+		}).Do()
+
+		if err != nil {
+			logger.Error("❌ Failed to find 'Add to Drive' option (li[data-value='DRIVE']): %v", err)
+			return fmt.Errorf("failed to select destination: option not found")
+		}
+		driveOption.MustClick()
+		time.Sleep(1 * time.Second)
+	}
 
 	// Select 50GB to reduce file count (fewer ZIPs to return)
 	logger.Debug(i18n.T("config_size"))
 	// Open size menu
+	// Ensure we don't confuse it with destination menu if they prefer similar selectors
+	// Size select usually has aria-label="File size select"
 	page.MustElement(`div[aria-label="File size select"]`).MustClick()
 	time.Sleep(500 * time.Millisecond)
 	// Select 50 GB option
@@ -223,7 +270,7 @@ func (m *Manager) RequestTakeout(mode string) error {
 	time.Sleep(500 * time.Millisecond)
 
 	// Create export
-	logger.Debug(i18n.T("creating_export"))
+	logger.Info(i18n.T("creating_export"))
 
 	// Setup navigation wait BEFORE clicking to avoid race condition
 	wait := page.MustWaitNavigation()
@@ -234,11 +281,8 @@ func (m *Manager) RequestTakeout(mode string) error {
 	wait()
 
 	// Ensure we are on the Manage page
-	// Sometimes it redirects to /settings/takeout/custom/..., then eventually to /manage
-	// We'll wait for the URL to contain "manage"
 	logger.Debug(i18n.T("browser_wait_redirect"))
 	err := page.WaitElementsMoreThan(`div[data-in-progress="true"], button[aria-label="Cancel export"]`, 0)
-	// Or just wait for URL
 	if err != nil {
 		// Fallback: Check URL loop
 		for i := 0; i < 10; i++ {
@@ -262,6 +306,7 @@ type ExportStatus struct {
 	CreatedAt     time.Time
 	ID            string
 	StatusText    string // Raw status text (e.g., "Complete", "Cancelled")
+	DownloadMode  string // "driveDownload" or "directDownload"
 }
 
 // CheckExportStatus checks if there are active exports or exports ready to download
@@ -310,16 +355,12 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	}
 
 	// Strategy B: Fallback - Look for "Cancel export" buttons (UI way)
-	// If Strategy A found nothing, this catches cases where attributes changed
 	if len(statuses) == 0 {
-		// Look for cancel buttons, which only appear on active exports
 		cancelButtons, err := page.Elements(`button[aria-label="Cancel export"]`)
 		if err == nil && len(cancelButtons) > 0 {
-			// At least one in progress. Try to deduce if it is Google Photos.
 			logger.Info(i18n.T("browser_detect_cancel"))
 			statuses = append(statuses, ExportStatus{InProgress: true, ID: "unknown-pending"})
 		} else {
-			// Plain text as last resort (English ONLY)
 			bodyText, _ := page.Element("body")
 			text, _ := bodyText.Text()
 			if strings.Contains(text, "being prepared") || strings.Contains(text, "Export in progress") {
@@ -330,7 +371,6 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 	}
 
 	// 2. Iterate over past exports list (Completed, Cancelled, etc.)
-	// Look for ul[jsname="archivelist"] and its li elements
 	if list, err := page.Element(`ul[jsname="archivelist"]`); err == nil {
 		items, _ := list.Elements("li")
 		for _, item := range items {
@@ -342,8 +382,7 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 
 			var st ExportStatus
 
-			// Extract ID from link
-			// <a href="./manage/archive/ID_AQUI" ...>
+			// Extract ID
 			if link, err := item.Element("a"); err == nil {
 				href, _ := link.Attribute("href")
 				if href != nil {
@@ -354,9 +393,7 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 				}
 			}
 
-			// Extract Status (Visible text)
-			// <p class="BXHFQ">Completo</p> o <p class="BXHFQ">Cancelado</p>
-			// Note: By forcing ?hl=en, we expect "Complete", "Cancelled", etc.
+			// Extract Status
 			if statusEl, err := item.Element(`p.BXHFQ`); err == nil {
 				text, _ := statusEl.Text()
 				st.StatusText = text
@@ -365,7 +402,21 @@ func (m *Manager) CheckExportStatus() ([]ExportStatus, error) {
 				}
 			}
 
-			// TODO: Extract creation date if necessary (it's in a div inside li)
+			// Detect Type: Drive vs Download Link
+			// Look for div.xsr7od
+			// "Data backup to Drive" vs "Data backup to a download link"
+			if typeEl, err := item.Element(`div.xsr7od`); err == nil {
+				typeText, _ := typeEl.Text()
+				if strings.Contains(typeText, "Drive") {
+					st.DownloadMode = "driveDownload" // config.ModeDriveDownload
+				} else if strings.Contains(typeText, "download link") {
+					st.DownloadMode = "directDownload" // config.ModeDirectDownload
+				}
+			}
+
+			// Extract Date from the same div.xsr7od (it contains a div child with date)
+			// Text() might return "Data backup to Drive\nCreated Yesterday..."
+			// We can try to reuse the general parsing if needed, or rely on what we have.
 
 			statuses = append(statuses, st)
 		}
@@ -1170,4 +1221,140 @@ func ParseSize(s string) int64 {
 		multiplier = 1024 * 1024 * 1024 * 1024
 	}
 	return int64(val * float64(multiplier))
+}
+
+// ScheduleRecurringTakeout configures a recurring export (2 months, 1 year) to Drive
+func (m *Manager) ScheduleRecurringTakeout() error {
+	logger.Info("📅 Configuring recurring export (2 months, Drive)...")
+
+	// 1. Navigation & Product Selection
+	logger.Info(i18n.T("navigating_takeout"))
+	page := m.Browser.MustPage(URLTakeoutSettings)
+	page.MustWaitLoad()
+
+	// Deselect all
+	logger.Debug(i18n.T("deselecting_products"))
+	page.MustElement(`[aria-label="Deselect all"]`).MustClick()
+	time.Sleep(1 * time.Second)
+
+	// Select Photos
+	logger.Info(i18n.T("selecting_photos"))
+	productLabel := page.MustElementX(`//div[normalize-space(text())="Google Photos"]`)
+	found := false
+	parent := productLabel
+	for i := 0; i < 10; i++ {
+		var err error
+		parent, err = parent.Parent()
+		if err != nil {
+			break
+		}
+		if has, _, _ := parent.Has(`input[type="checkbox"]`); has {
+			if _, err := parent.Element(`input[type="checkbox"]:checked`); err == nil {
+				// Already checked
+			} else {
+				parent.MustElement(`input[type="checkbox"]`).MustClick()
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("could not find Google Photos checkbox")
+	}
+
+	// Next step
+	logger.Debug(i18n.T("next_step"))
+	page.MustElement(`button[aria-label="Next step"]`).MustClick()
+	page.MustWaitLoad()
+	time.Sleep(1 * time.Second)
+
+	// 2. Destination: Add to Drive
+	logger.Info(i18n.T("browser_selecting_drive"))
+	// Open menu
+	destMenu, err := page.Race().Element(`div[role="combobox"][aria-labelledby="destinationSelectID"]`).Element(`div[role="combobox"]`).Handle(func(e *rod.Element) error {
+		return e.WaitVisible()
+	}).Do()
+	if err != nil {
+		return fmt.Errorf(i18n.T("browser_dest_fail"), err)
+	}
+	destMenu.MustClick()
+	time.Sleep(1 * time.Second)
+
+	// Select Option
+	driveOption, err := page.Race().Element(`li[data-value="DRIVE"]`).ElementX(`//span[contains(text(), "Add to Drive")]/ancestor::li`).Handle(func(e *rod.Element) error {
+		return e.WaitVisible()
+	}).Do()
+	if err != nil {
+		return fmt.Errorf(i18n.T("browser_drive_fail"), err)
+	}
+	driveOption.MustClick()
+	time.Sleep(1 * time.Second)
+
+	// 3. Frequency: Export every 2 months for 1 year
+	logger.Info(i18n.T("browser_selecting_freq"))
+
+	// Selector for the radio button value="2"
+	freqOption, err := page.Element(`input[name="scheduleoptions"][value="2"]`)
+	if err != nil {
+		logger.Warn(i18n.T("browser_freq_fail"))
+		freqLabel, err := page.ElementX(`//div[contains(text(), "Export every 2 months")]`)
+		if err != nil {
+			return fmt.Errorf(i18n.T("browser_freq_error"), err)
+		}
+		freqLabel.MustClick()
+	} else {
+		parent, _ := freqOption.Parent()
+		parent.MustClick()
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	// 4. Size: 50 GB
+	logger.Debug(i18n.T("browser_selecting_size"))
+	page.MustElement(`div[aria-label="File size select"]`).MustClick()
+	time.Sleep(500 * time.Millisecond)
+	page.MustElementR("li", "50 GB").MustClick()
+	time.Sleep(500 * time.Millisecond)
+
+	// 5. Create
+	logger.Info(i18n.T("creating_export"))
+
+	// Click create button
+	btn, err := page.ElementR("button", "Create export")
+	if err != nil {
+		// Fallback specific selector
+		btn, err = page.Element(`button[aria-label="Create export"]`)
+		if err != nil {
+			return fmt.Errorf(i18n.T("browser_create_btn_fail"), err)
+		}
+	}
+	btn.MustClick()
+
+	// 6. Verification Wait (Passkey / Success)
+	logger.Info(i18n.T("browser_wait_google"))
+
+	// Allow time for navigation or auth prompt to appear
+	time.Sleep(5 * time.Second)
+
+	// Check if we are already redirected to a success page
+	// Success URLs:
+	// - https://takeout.google.com/takeout/downloads
+	// - https://takeout.google.com/settings/email (sometimes redirects here)
+	url := page.MustInfo().URL
+	if strings.Contains(url, "takeout/downloads") || strings.Contains(url, "takeout/settings") {
+		logger.Info(i18n.T("browser_redirect_success"))
+	} else {
+		// If not redirected, we are likely in an Auth Challenge or stuck
+		fmt.Println("\n" + strings.Repeat("=", 60))
+		fmt.Println(i18n.T("browser_auth_required_title"))
+		fmt.Println(strings.Repeat("=", 60))
+		fmt.Println(i18n.T("browser_auth_required_body"))
+		fmt.Println("\n" + i18n.T("browser_press_enter"))
+		fmt.Println(strings.Repeat("=", 60))
+
+		var input string
+		fmt.Scanln(&input)
+	}
+
+	logger.Info("✅ Schedule process finished.")
+	return nil
 }

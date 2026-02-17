@@ -6,29 +6,27 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	UserID               string        `mapstructure:"user_id"`
-	WorkingPath          string        `mapstructure:"working_path"`
-	IndexPath            string        `mapstructure:"index_path"`
-	ClientID             string        `mapstructure:"client_id"`
-	ClientSecret         string        `mapstructure:"client_secret"`
-	TokenPath            string        `mapstructure:"token_path"`
-	BackupFrequency      time.Duration `mapstructure:"backup_frequency"`
-	DownloadMode         string        `mapstructure:"download_mode"`          // "directDownload" or "driveDownload"
-	FixAmbiguousMetadata string        `mapstructure:"fix_ambiguous_metadata"` // "yes", "no", "interactive"
-	BackupPath           string        `mapstructure:"backup_path"`            // Where to store the final organized photos
-	ImmichMasterEnabled  bool          `mapstructure:"immich_master_enabled"`  // Whether to maintain a master directory for Immich
-	ImmichMasterPath     string        `mapstructure:"immich_master_path"`     // Relative path for Immich master directory
+	UserID               string `mapstructure:"user_id"`
+	WorkingPath          string `mapstructure:"working_path"`
+	IndexPath            string `mapstructure:"index_path"`
+	ClientID             string `mapstructure:"client_id"`
+	ClientSecret         string `mapstructure:"client_secret"`
+	TokenPath            string `mapstructure:"token_path"`
+	EmailAlertTo         string `mapstructure:"email_alert_to"`         // Destination email for alerts (uses system msmtp)
+	FixAmbiguousMetadata string `mapstructure:"fix_ambiguous_metadata"` // "yes", "no", "interactive"
+	BackupPath           string `mapstructure:"backup_path"`            // Where to store the final organized photos
+	ImmichMasterEnabled  bool   `mapstructure:"immich_master_enabled"`  // Whether to maintain a master directory for Immich
+	ImmichMasterPath     string `mapstructure:"immich_master_path"`     // Relative path for Immich master directory
+	RcloneRemote         string `mapstructure:"rclone_remote"`          // Name of the rclone remote (default: "drive:")
 }
 
 const (
-	ModeDirectDownload = "directDownload"
-	ModeDriveDownload  = "driveDownload"
+// Download modes removed as they are now command-specific
 )
 
 var AppConfig Config
@@ -51,13 +49,12 @@ func InitConfig() {
 	// 3. Default values
 	viper.SetDefault("working_path", "./work")
 	viper.SetDefault("index_path", "./index.jsonl")
-	viper.SetDefault("backup_frequency", "168h") // 7 days (24*7)
-	viper.SetDefault("download_mode", ModeDirectDownload)
-	viper.SetDefault("fix_ambiguous_metadata", "interactive")
 	viper.SetDefault("fix_ambiguous_metadata", "interactive")
 	viper.SetDefault("backup_path", "") // Empty by default
 	viper.SetDefault("immich_master_enabled", false)
 	viper.SetDefault("immich_master_path", "immich-master")
+	viper.SetDefault("rclone_remote", "drive:")
+	viper.SetDefault("email_alert_to", "")
 
 	// Define default path for token inside config directory
 	if home, err := os.UserHomeDir(); err == nil {

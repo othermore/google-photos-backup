@@ -34,19 +34,30 @@ var configureCmd = &cobra.Command{
 		workingPath := prompt(i18n.T("prompt_working_dir"), config.AppConfig.WorkingPath)
 		absWorkingPath, _ := filepath.Abs(workingPath)
 
-		// 2. Download Mode
-		currentMode := config.AppConfig.DownloadMode
-		if currentMode == "" {
-			currentMode = config.ModeDirectDownload
+		// 2. Rclone Remote (For 'drive' command)
+		rcloneRemote := config.AppConfig.RcloneRemote
+		if rcloneRemote == "" {
+			rcloneRemote = "drive:"
 		}
-		modePrompt := fmt.Sprintf(i18n.T("prompt_download_mode"),
-			config.ModeDirectDownload, config.ModeDriveDownload, currentMode)
+		// Always ask for rclone remote as it is needed for 'drive' command
+		rclonePrompt := fmt.Sprintf(i18n.T("prompt_rclone_remote"), rcloneRemote)
+		rcloneRemote = prompt(rclonePrompt, rcloneRemote)
 
-		dlMode := prompt(modePrompt, currentMode)
-		if dlMode != config.ModeDirectDownload && dlMode != config.ModeDriveDownload {
-			logger.Info(i18n.T("invalid_mode"), config.ModeDirectDownload)
-			dlMode = config.ModeDirectDownload
+		// 2.5 Email Alert To (New)
+		currentEmail := config.AppConfig.EmailAlertTo
+		emailPrompt := fmt.Sprintf("Email for alerts (uses system msmtp) [%s]: ", currentEmail)
+		// We don't have i18n for this yet, hardcoding or adding later.
+		// For now simple prompt.
+		if currentEmail != "" {
+			emailPrompt = fmt.Sprintf("Email for alerts (uses system msmtp) [default: %s]: ", currentEmail)
 		}
+		// Simple prompt wrapper doesn't support formatted string in prompt usually, it prints it.
+		// logic in prompt() function (not shown) usually prints.
+		// Let's use the pattern from line 42.
+
+		// Actually let's just reuse prompt()
+		// We need to add i18n key for email prompt later.
+		emailAlertTo := prompt(emailPrompt, currentEmail)
 
 		// 3. Fix Ambiguous Metadata
 		currentFix := config.AppConfig.FixAmbiguousMetadata
@@ -73,7 +84,9 @@ var configureCmd = &cobra.Command{
 
 		// 5. Guardar
 		viper.Set("working_path", absWorkingPath)
-		viper.Set("download_mode", dlMode)
+		viper.Set("working_path", absWorkingPath)
+		viper.Set("email_alert_to", emailAlertTo)
+		viper.Set("rclone_remote", rcloneRemote)
 		viper.Set("fix_ambiguous_metadata", fixMode)
 		viper.Set("backup_path", absBackupPath)
 

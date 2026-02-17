@@ -18,6 +18,11 @@ func Info(format string, args ...interface{}) {
 	fmt.Printf(format+"\n", args...)
 }
 
+// Warn always prints with a warning icon
+func Warn(format string, args ...interface{}) {
+	fmt.Printf("⚠️  "+format+"\n", args...)
+}
+
 // Error always prints
 func Error(format string, args ...interface{}) {
 	fmt.Printf("❌ "+format+"\n", args...)

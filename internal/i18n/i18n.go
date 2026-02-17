@@ -53,6 +53,14 @@ var messages = map[string]map[string]string{
 		"en": "Select download mode (%s/%s) [default: %s]",
 		"es": "Selecciona el modo de descarga (%s/%s) [por defecto: %s]",
 	},
+	"rclone_notice": {
+		"en": "⚠️  You selected 'driveDownload'. You MUST have rclone installed and configured with a remote pointing to your Google Drive.",
+		"es": "⚠️  Has seleccionado 'driveDownload'. DEBES tener rclone instalado y configurado con un remoto apuntando a tu Google Drive.",
+	},
+	"prompt_rclone_remote": {
+		"en": "Enter your rclone remote name [default: %s]",
+		"es": "Introduce el nombre de tu remoto rclone [por defecto: %s]",
+	},
 	"login_ask": {
 		"en": "\nDo you want to log in to Google now to validate access? (y/n)",
 		"es": "\n¿Deseas iniciar sesión en Google ahora para validar el acceso? (s/n)",
@@ -322,8 +330,8 @@ var messages = map[string]map[string]string{
 		"es": "Pendiente",
 	},
 	"drive_mode_warning": {
-		"en": "⚠️  'driveDownload' mode detected. Not supported yet.",
-		"es": "⚠️  Modo 'driveDownload' detectado. Aún no está soportado.",
+		"en": "⚠️  'driveDownload' export detected. 'sync' command is for direct downloads only. Please use 'run' command to process Drive exports.",
+		"es": "⚠️  Detectada exportación 'driveDownload'. El comando 'sync' es solo para descargas directas. Usa el comando 'run' para procesar exportaciones de Drive.",
 	},
 	"quota_exceeded_limit": {
 		"en": "⛔ Download quota exceeded (Quota Exceeded).",
@@ -676,6 +684,295 @@ var messages = map[string]map[string]string{
 	"browser_detect_text": {
 		"en": "⚠️  Detected in-progress text on page. Waiting.",
 		"es": "⚠️  Detectado texto de 'en progreso' en la página. Esperando.",
+	},
+	// --- New Commands ---
+	"schedule_start": {
+		"en": "Configuring scheduled Takeout...",
+		"es": "Configurando Takeout programado...",
+	},
+	"schedule_step_1": {
+		"en": "This will set up a recurring export on Google Takeout.",
+		"es": "Esto configurará una exportación recurrente en Google Takeout.",
+	},
+	"schedule_freq": {
+		"en": "Frequency: Every 2 months",
+		"es": "Frecuencia: Cada 2 meses",
+	},
+	"schedule_dest": {
+		"en": "Destination: Drive",
+		"es": "Destino: Drive",
+	},
+	"schedule_size": {
+		"en": "Size: 50GB",
+		"es": "Tamaño: 50GB",
+	},
+	"schedule_success": {
+		"en": "\n✅ Configuration completed! Google will create exports every 2 months.",
+		"es": "\n✅ ¡Configuración completada! Google creará exportaciones cada 2 meses.",
+	},
+	"drive_start": {
+		"en": "Starting Drive Backup...",
+		"es": "Iniciando Backup desde Drive...",
+	},
+	"drive_no_config": {
+		"en": "❌ Remote 'rclone' not configured. Run 'configure' first.",
+		"es": "❌ Remoto 'rclone' no configurado. Ejecuta 'configure' primero.",
+	},
+	"drive_check": {
+		"en": "🔍 Checking Drive for new exports...",
+		"es": "🔍 Comprobando Drive en busca de nuevas exportaciones...",
+	},
+	"drive_found": {
+		"en": "📦 Found %d new files in Drive.",
+		"es": "📦 Encontrados %d nuevos archivos en Drive.",
+	},
+	"drive_downloading": {
+		"en": "⬇️  Downloading (and moving) %s...",
+		"es": "⬇️  Descargando (y moviendo) %s...",
+	},
+	"drive_processing": {
+		"en": "⚙️  Processing %s...",
+		"es": "⚙️  Procesando %s...",
+	},
+	"drive_success": {
+		"en": "✅ Drive backup cycle completed.",
+		"es": "✅ Ciclo de backup de Drive completado.",
+	},
+	"import_start": {
+		"en": "📂 Starting Import from: %s",
+		"es": "📂 Iniciando Importación desde: %s",
+	},
+	"import_found": {
+		"en": "📦 Found %d archives to process.",
+		"es": "📦 Encontrados %d archivos para procesar.",
+	},
+	"import_success": {
+		"en": "✅ Import completed successfully!",
+		"es": "✅ ¡Importación completada con éxito!",
+	},
+	"engine_start": {
+		"en": "🚀 Starting Engine Processing...",
+		"es": "🚀 Iniciando Procesamiento del Motor...",
+	},
+	"engine_unzip": {
+		"en": "📦 Unzipping %s...",
+		"es": "📦 Descomprimiendo %s...",
+	},
+	"engine_meta": {
+		"en": "📅 Fixing Metadata...",
+		"es": "📅 Corrigiendo Metadatos...",
+	},
+	"engine_organize": {
+		"en": "📂 Organizing and Moving...",
+		"es": "📂 Organizando y Moviendo...",
+	},
+	"engine_dedup": {
+		"en": "♻️  Deduplicating...",
+		"es": "♻️  Deduplicando...",
+	},
+	"engine_finalize": {
+		"en": "🏁 Finalizing and Cleaning up...",
+		"es": "🏁 Finalizando y Limpiando...",
+	},
+	// --- Schedule Command ---
+	"schedule_title": {
+		"en": "📅  Configuring Recurring Export",
+		"es": "📅  Configurando Exportación Recurrente",
+	},
+	"schedule_login_info": {
+		"en": "Please run 'gpb configure' to login first, or log in manually in the opened window.",
+		"es": "Por favor ejecuta 'gpb configure' para loguearte primero, o inicia sesión manualmente en la ventana abierta.",
+	},
+	"schedule_login_fail": {
+		"en": "Login failed or cancelled.",
+		"es": "Inicio de sesión fallido o cancelado.",
+	},
+	"schedule_failed": {
+		"en": "Failed to schedule export: %v",
+		"es": "Fallo al programar la exportación: %v",
+	},
+	"schedule_complete_msg": {
+		"en": "Google will now export your photos every 2 months to Drive.",
+		"es": "Google ahora exportará tus fotos cada 2 meses a Drive.",
+	},
+	"schedule_next_steps": {
+		"en": "Use 'gpb drive' to process these exports automatically.",
+		"es": "Usa 'gpb drive' para procesar estas exportaciones automáticamente.",
+	},
+	"browser_selecting_drive": {
+		"en": "📂 Selecting 'Add to Drive'...",
+		"es": "📂 Seleccionando 'Añadir a Drive'...",
+	},
+	"browser_selecting_freq": {
+		"en": "⏰ Selecting 'Export every 2 months'...",
+		"es": "⏰ Seleccionando 'Exportar cada 2 meses'...",
+	},
+	"browser_selecting_size": {
+		"en": "   - Selecting 50 GB size...",
+		"es": "   - Seleccionando tamaño de 50 GB...",
+	},
+	"browser_create_btn_fail": {
+		"en": "could not find Create Export button: %v",
+		"es": "no se pudo encontrar el botón Crear Exportación: %v",
+	},
+	"browser_wait_google": {
+		"en": "⏳ Waiting for Google response...",
+		"es": "⏳ Esperando respuesta de Google...",
+	},
+	"browser_redirect_success": {
+		"en": "✅ Schedule likely successful (redirected).",
+		"es": "✅ Programación probablemente exitosa (redirigido).",
+	},
+	"browser_auth_required_title": {
+		"en": "⚠️  ACTION REQUIRED",
+		"es": "⚠️  ACCIÓN REQUERIDA",
+	},
+	"browser_auth_required_body": {
+		"en": "Google requires verification (Passkey, 2FA, Password).\nThe browser is kept open. Please complete the check in the window.",
+		"es": "Google requiere verificación (Passkey, 2FA, Contraseña).\nEl navegador se mantiene abierto. Por favor completa la comprobación en la ventana.",
+	},
+	"browser_press_enter": {
+		"en": "🔴 Press ENTER here once you see the 'Export progress' screen.",
+		"es": "🔴 Presiona ENTER aquí una vez veas la pantalla de 'Export progress'.",
+	},
+	"browser_freq_fail": {
+		"en": "could not find frequency radio by value='2', trying text...",
+		"es": "no se pudo encontrar radio de frecuencia por value='2', probando texto...",
+	},
+	"browser_freq_error": {
+		"en": "failed to find frequency option: %v",
+		"es": "fallo al encontrar opción de frecuencia: %v",
+	},
+	"browser_dest_fail": {
+		"en": "failed to find destination dropdown: %v",
+		"es": "fallo al encontrar menú de destino: %v",
+	},
+	"browser_drive_fail": {
+		"en": "failed to find 'Add to Drive' option: %v",
+		"es": "fallo al encontrar opción 'Añadir a Drive': %v",
+	},
+	"browser_photos_fail": {
+		"en": "could not find Google Photos checkbox",
+		"es": "no se pudo encontrar el checkbox de Google Photos",
+	},
+	// --- Drive Command ---
+	"drive_robot_start": {
+		"en": "🤖 Starting Automated Drive Backup...",
+		"es": "🤖 Iniciando Backup Automatizado de Drive...",
+	},
+	"drive_list_fail": {
+		"en": "Failed to list files from Drive: %v",
+		"es": "Fallo al listar archivos de Drive: %v",
+	},
+	"drive_found_count": {
+		"en": "📂 Found %d archives in Drive. Processing...",
+		"es": "📂 Encontrados %d archivos en Drive. Procesando...",
+	},
+	"drive_download_prog": {
+		"en": "[%d/%d] Downloading %s...",
+		"es": "[%d/%d] Descargando %s...",
+	},
+	"drive_dl_move_fail": {
+		"en": "Failed to download/move %s: %v",
+		"es": "Fallo al descargar/mover %s: %v",
+	},
+	"drive_process_fail": {
+		"en": "Failed to process %s: %v",
+		"es": "Fallo al procesar %s: %v",
+	},
+	"drive_final_fail": {
+		"en": "Finalization failed: %v",
+		"es": "Finalización fallida: %v",
+	},
+	"drive_processed_success": {
+		"en": "✅ Drive Backup processed successfully!",
+		"es": "✅ Backup de Drive procesado con éxito!",
+	},
+	"drive_no_files": {
+		"en": "ℹ️  No new archives found in Drive.",
+		"es": "ℹ️  No se encontraron nuevos archivos en Drive.",
+	},
+	"drive_stale_warn": {
+		"en": "⚠️  Backup is stale (> 3 months). Checking alert policy...",
+		"es": "⚠️  Backup obsoleto (> 3 meses). Comprobando política de alertas...",
+	},
+	"drive_alert_subject": {
+		"en": "[Google Photos Backup] ⚠️ Backup Stale Alert",
+		"es": "[Google Photos Backup] ⚠️ Alerta de Backup Obsoleto",
+	},
+	"drive_alert_body": {
+		"en": "Your last successful backup was on %s (%s ago).\n\nPlease check if your Drive export is running correctly.",
+		"es": "Tu último backup exitoso fue el %s (hace %s).\n\nPor favor comprueba si tu exportación a Drive está funcionando correctamente.",
+	},
+	"drive_alert_sent": {
+		"en": "✅ Alert email sent.",
+		"es": "✅ Email de alerta enviado.",
+	},
+	"drive_alert_fail": {
+		"en": "Failed to send alert: %v",
+		"es": "Fallo al enviar alerta: %v",
+	},
+	"drive_alert_skip": {
+		"en": "ℹ️  Alert already sent recently (%s). Skipping.",
+		"es": "ℹ️  Alerta enviada recientemente (%s). Saltando.",
+	},
+	// --- Import Command ---
+	"import_invalid_dir": {
+		"en": "Invalid import directory: %s",
+		"es": "Directorio de importación inválido: %s",
+	},
+	"import_read_fail": {
+		"en": "Failed to read dir: %v",
+		"es": "Fallo al leer directorio: %v",
+	},
+	"import_no_zips": {
+		"en": "No zip files found in %s",
+		"es": "No se encontraron archivos zip en %s",
+	},
+	"import_found_count": {
+		"en": "Found %d archives to process.",
+		"es": "Encontrados %d archivos para procesar.",
+	},
+	"import_prog": {
+		"en": "[%d/%d] Importing %s...",
+		"es": "[%d/%d] Importando %s...",
+	},
+	"import_copying": {
+		"en": "   - Copying to temp workspace...",
+		"es": "   - Copiando al espacio de trabajo temporal...",
+	},
+	"import_copy_fail": {
+		"en": "Failed to copy zip: %v",
+		"es": "Fallo al copiar zip: %v",
+	},
+	"import_process_fail": {
+		"en": "Failed to process zip: %v",
+		"es": "Fallo al procesar zip: %v",
+	},
+	"import_final_fail": {
+		"en": "Finalization failed: %v",
+		"es": "Finalización fallida: %v",
+	},
+	"import_done": {
+		"en": "✅ Import completed successfully!",
+		"es": "✅ Importación completada con éxito!",
+	},
+	// --- Notifier (msmtp) ---
+	"notifier_skipped": {
+		"en": "Email alert skipped: 'email_alert_to' is not configured.",
+		"es": "Alerta de email omitida: 'email_alert_to' no está configurado.",
+	},
+	"notifier_no_binary": {
+		"en": "msmtp not found in PATH. Please install and configure msmtp",
+		"es": "msmtp no encontrado en PATH. Por favor instala y configura msmtp",
+	},
+	"notifier_sending": {
+		"en": "📧 Sending alert email to %s...",
+		"es": "📧 Enviando email de alerta a %s...",
+	},
+	"notifier_fail": {
+		"en": "failed to send email via msmtp: %v, output: %s",
+		"es": "fallo al enviar email vía msmtp: %v, salida: %s",
 	},
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"google-photos-backup/internal/browser"
 	"google-photos-backup/internal/config"
+	"google-photos-backup/internal/engine"
 	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/registry"
 	"os"
@@ -252,9 +253,10 @@ var syncCmd = &cobra.Command{
 					// Si no hay huérfanas, creamos una nueva (importación pura)
 					logger.Info(i18n.T("importing_export"), st.ID, st.StatusText)
 					newEntry := registry.ExportEntry{
-						ID:          st.ID,
-						RequestedAt: st.CreatedAt,              // Puede ser zero si no se parseó
-						Status:      registry.StatusInProgress, // Default, se actualizará abajo
+						ID:           st.ID,
+						RequestedAt:  st.CreatedAt,              // Puede ser zero si no se parseó
+						Status:       registry.StatusInProgress, // Default, se actualizará abajo
+						DownloadMode: st.DownloadMode,           // Saving detected mode
 					}
 					reg.Add(newEntry)
 					entry = reg.Get(st.ID)
@@ -263,6 +265,13 @@ var syncCmd = &cobra.Command{
 
 			// Actualizar estado
 			updated := false
+
+			// Update mode if we detected it and it was missing
+			if st.DownloadMode != "" && entry.DownloadMode == "" {
+				entry.DownloadMode = st.DownloadMode
+				updated = true
+			}
+
 			if st.InProgress {
 				inProgressStatus = &st
 				if entry.Status != registry.StatusInProgress {
@@ -335,6 +344,17 @@ var syncCmd = &cobra.Command{
 		if completedStatus != nil {
 			logger.Info(i18n.T("ready_to_download"))
 
+			// 1. Obtener lista de ficheros (si no la tenemos ya en registro)
+			entry := reg.Get(completedStatus.ID)
+
+			// Check download mode - SYNC IS ALWAYS DIRECT DOWNLOAD
+			// Legacy: If we find a 'driveDownload' here, we should warn or handle it.
+			// The new registry logic should filter or we just process it if possible?
+			// 'sync' command is specifically for direct download flow.
+			// If we found a file-list, we just download it.
+
+			// ... (ProgressTracker init code)
+
 			// Crear carpeta de descargas específica para esta exportación
 			// Ej: backup_path/downloads/ID_EXPORTACION
 			downloadDir := filepath.Join(config.AppConfig.WorkingPath, "downloads", completedStatus.ID)
@@ -345,9 +365,6 @@ var syncCmd = &cobra.Command{
 
 			// NEW FLOW:
 			logger.Info(i18n.T("starting_manager"))
-
-			// 1. Obtener lista de ficheros (si no la tenemos ya en registro)
-			entry := reg.Get(completedStatus.ID)
 
 			// Logic to migrate or load state
 			statePath := filepath.Join(downloadDir, "state.json")
@@ -426,17 +443,10 @@ var syncCmd = &cobra.Command{
 				fmt.Printf(i18n.T("list_saved")+"\n", len(files))
 			}
 
-			// 4. Start Download with Progress
-			// Check download mode
-			mode := entry.DownloadMode
-			if mode == "" {
-				mode = config.ModeDirectDownload
-			}
+			// 4. Start Download with Progress (and Processing)
 
-			if mode == config.ModeDriveDownload {
-				logger.Info(i18n.T("drive_mode_warning"))
-				return
-			}
+			// Init Engine
+			eng := engine.New(config.AppConfig.WorkingPath, config.AppConfig.BackupPath)
 
 			// Init Tracker
 			tracker := &ProgressTracker{
@@ -462,14 +472,27 @@ var syncCmd = &cobra.Command{
 					if oldStatus != "downloading" && newStatus == "downloading" {
 						logger.Info(i18n.T("sync_download_start"), updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
 					}
-					if oldStatus != "completed" && newStatus == "completed" {
-						logger.Info(i18n.T("sync_download_finish"), updatedFile.Filename, browser.FormatSize(updatedFile.SizeBytes))
+					// Completed logging handled below after processing
+				}
+
+				// If Completed, Trigger Processing
+				if oldStatus != "completed" && newStatus == "completed" {
+					// Download finished! Process Immediately!
+					zipPath := filepath.Join(downloadDir, updatedFile.Filename)
+					logger.Info("⚡ Downloaded %s. Processing immediately...", updatedFile.Filename)
+
+					if err := eng.ProcessZip(zipPath); err != nil {
+						logger.Error("❌ processing failed for %s: %v", updatedFile.Filename, err)
+						// Mark as failed in tracker? Or just log?
+						// Failure in processing shouldn't stop the next download, but is critical.
+					} else {
+						logger.Info("✅ Processed %s (Space freed).", updatedFile.Filename)
 					}
 				}
 
 				// Update in memory list
 				filesToDownload[idx] = updatedFile
-				tracker.Files = filesToDownload // Sync files to tracker (ref)
+				tracker.Files = filesToDownload
 
 				// Re-render
 				if !nonInteractive {
@@ -484,36 +507,27 @@ var syncCmd = &cobra.Command{
 				}
 				_ = state.Save(statePath)
 			})
-			fmt.Println() // Newline after loop or progress
+			fmt.Println()
 
 			if err != nil {
 				if err == browser.ErrQuotaExceeded {
 					fmt.Println(i18n.T("sync_quota_exceeded"))
-					fmt.Println(i18n.T("sync_quota_action"))
-
-					// CLEANUP: Wipe the directory to save space and remove bad state
-					if err := os.RemoveAll(downloadDir); err != nil {
-						fmt.Printf(i18n.T("sync_cleanup_error")+"\n", err)
-					} else {
-						fmt.Println(i18n.T("sync_cleanup_success"))
-					}
-
-					entry.Status = registry.StatusExpired
-					entry.Files = nil
-					reg.Update(*entry)
-					reg.Save()
-					return // Loop will continue? Or return to main? Current loop is over exports.
-					// We return to allow next run to request new.
+					// ... (cleanup logic) ...
+					return
 				}
-				// We need a "Downloaded" status.
-				// For now, let's leave as Downloading but maybe set a flag or logic?
-				// Or assume Processed means Downloaded? No, Processed means Metadata fixed.
-
-				// Let's just say "Descarga finalizada"
 				logger.Error(i18n.T("download_finished_error"), err)
-				// Don't mark as downloaded if failed
 			} else {
 				logger.Info(i18n.T("download_completed"), downloadDir)
+
+				// FINALIZE Pipeline
+				logger.Info("🔄 Finalizing global processing...")
+				if err := eng.Finalize(); err != nil {
+					logger.Error("❌ Finalization failed: %v", err)
+				} else {
+					logger.Info("✅ All files processed and organized.")
+					// Cleanup Download Dir (should be empty of zips, but might have state.json)
+					os.RemoveAll(downloadDir)
+				}
 			}
 			reg.Update(*entry)
 			reg.Save()
@@ -521,47 +535,20 @@ var syncCmd = &cobra.Command{
 			return
 		}
 
-		// 2. Si no hay nada en curso, comprobar frecuencia antes de solicitar nueva
-		lastSuccess := reg.GetLastSuccessful()
-		frequency := viper.GetDuration("backup_frequency")
-		force, _ := cmd.Flags().GetBool("force")
+		// 2. Si no hay nada en curso, solicitar nueva
+		logger.Info(i18n.T("resquesting_new_direct"))
 
-		// Si hay una copia exitosa reciente, no hacemos nada
-		if !force && lastSuccess != nil && time.Since(lastSuccess.CompletedAt) < frequency {
-			nextBackup := lastSuccess.CompletedAt.Add(frequency)
-			logger.Info(i18n.T("last_success"), lastSuccess.CompletedAt.Format("02/01/2006 15:04"))
-			logger.Info(i18n.T("last_stats"),
-				lastSuccess.FileCount, lastSuccess.TotalSize, lastSuccess.NewPhotosCount)
-
-			logger.Info(i18n.T("next_backup"), frequency, nextBackup.Format("02/01/2006 15:04"))
-			logger.Info(i18n.T("use_force"))
-			return
-		}
-
-		// Check config mode for new export
-		mode := config.AppConfig.DownloadMode
-		if mode == "" {
-			mode = config.ModeDirectDownload
-		}
-
-		if mode == config.ModeDriveDownload {
-			logger.Info(i18n.T("drive_mode_new"))
-			return
-		}
-
-		if err := bm.RequestTakeout(mode); err != nil {
+		if err := bm.RequestTakeout("directDownload"); err != nil {
 			logger.Error(i18n.T("takeout_req_error"), err)
 			return
 		}
 
-		// Double-check status to get the new ID immediately
-		// This ensures we don't save a ghost entry.
-		time.Sleep(5 * time.Second) // Give it a moment
+		// Double-check status
+		time.Sleep(5 * time.Second)
 		newStatuses, err := bm.CheckExportStatus()
 		newID := ""
 		if err == nil {
 			for _, st := range newStatuses {
-				// If we find one that is InProgress (or Created recently), use it
 				if st.InProgress {
 					newID = st.ID
 					break
@@ -577,11 +564,6 @@ var syncCmd = &cobra.Command{
 				Status:      registry.StatusInProgress,
 			})
 		} else {
-			// Fallback if we can't find the ID yet (maybe slow backend)
-			// We save it as "requested" but without ID.
-			// Ideally we shouldn't do this if we want to avoid ghosts,
-			// but we need to record that we tried.
-			// With the cleanup logic at start, this is safe-ish.
 			logger.Info(i18n.T("sync_pending_export"))
 			reg.Add(registry.ExportEntry{
 				RequestedAt: time.Now(),
