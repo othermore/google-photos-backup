@@ -245,14 +245,6 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 		logger.Warn(i18n.T("engine_index_save_fail"), err)
 	}
 
-	// 3. Deduplicate against Backup (Optimization: Same Volume Only)
-	if e.isSameVolume(extractDir, e.BackupDir) {
-		logger.Info(i18n.T("engine_opt_same_vol"))
-		if err := e.deduplicateAgainstBackup(extractDir); err != nil {
-			logger.Warn(i18n.T("engine_opt_fail"), err)
-		}
-	}
-
 	// 4. Delete Zip (Space Saving)
 	logger.Info(i18n.T("engine_zip_delete"))
 	if err := os.Remove(zipPath); err != nil {

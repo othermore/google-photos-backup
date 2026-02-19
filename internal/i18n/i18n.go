@@ -881,8 +881,8 @@ var messages = map[string]map[string]string{
 		"es": "   - Índice de Lote Cargado: %d ficheros existentes de zips previos.",
 	},
 	"engine_dedup_batch": {
-		"en": "   - Deduplicating against batch...",
-		"es": "   - Deduplicando contra el lote...",
+		"en": "   - Deduplicating (Global & Local)...",
+		"es": "   - Deduplicando (Global y Local)...",
 	},
 	"engine_hash_fail": {
 		"en": "Failed to hash %s: %v",
