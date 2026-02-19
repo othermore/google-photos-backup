@@ -71,33 +71,21 @@ var driveCmd = &cobra.Command{
 			for ts, groupFiles := range groups {
 				logger.Info("   - Analyzing batch: %s (%d files)", ts, len(groupFiles))
 
-				// Ready Check: Look for ...-001.zip (The "Special" small file or first volume)
-				// User observation: "Always creates a special file takeout-...Z-001.zip ... only when all others are generated."
-				// He also mentioned "takeout-...Z-3-001.zip".
-				// Let's check for a file ending in "-001.zip" OR exactly "takeout-<TS>-001.zip".
-				// The regex matched, so name is `takeout-<TS>-...`.
-				// If we have `takeout-<TS>-001.zip` specifically (usually the metadata/html one).
-
-				isReady := false
-				for _, f := range groupFiles {
-					// Check for the "Special" file. It usually acts as the manifest.
-					// If the user says it's named `takeout-TIMEOUT-001.zip` (without series count like -3-001),
-					// we check for that.
+				// Ready Check: Look for ...-001.zip (Signal)
+				var signalFile *rclone.File
+				for i := range groupFiles {
+					f := &groupFiles[i]
+					// Check for "special" small file
 					if f.Name == fmt.Sprintf("takeout-%s-001.zip", ts) {
-						isReady = true
+						signalFile = f
 						break
 					}
-					// Fallback: If we see ANY file ending in -001.zip, it might be the start.
-					// But for "Finish Signal", the small unique one is better.
-					// If user is unsure, maybe we should also check if we have multiple files if size > small.
 				}
 
-				if !isReady {
-					// STRICT CHECK: If we don't see the special file, we assume it's still generating.
-					// Unless it's a single file export?
+				if signalFile == nil {
+					// Fallback: If no explicit signal file, check if single file export
 					if len(groupFiles) == 1 && strings.HasSuffix(groupFiles[0].Name, ".zip") {
-						// Single file case
-						isReady = true
+						signalFile = &groupFiles[0] // Treat as signal (it's the only one)
 					} else {
 						logger.Info("   - Batch %s NOT READY (Waiting for -001.zip signal). Skipping.", ts)
 						continue
@@ -106,56 +94,98 @@ var driveCmd = &cobra.Command{
 
 				logger.Info("✅ Batch %s is READY. Processing...", ts)
 
-				// Download Phase
-				// We download all files to work/processing/<TS>/
 				batchWorkDir := filepath.Join(config.AppConfig.WorkingPath, "processing", ts)
 				if err := os.MkdirAll(batchWorkDir, 0755); err != nil {
 					logger.Error("Failed to create batch dir: %v", err)
 					continue
 				}
 
-				// Sort files? Not strictly necessary for parallel download but nice for logs.
-				sort.Slice(groupFiles, func(i, j int) bool {
-					return groupFiles[i].Name < groupFiles[j].Name
-				})
+				// Create Engine scoped to this batch directory
+				// This ensures Finalize() looks in batchWorkDir/extracted
+				batchEng := engine.New(batchWorkDir, config.AppConfig.BackupPath)
 
-				failCount := 0
-				downloadedFiles := []string{}
-
-				for i, file := range groupFiles {
-					logger.Info(i18n.T("drive_download_prog"), i+1, len(groupFiles), file.Name)
-
-					// Move (Download & Delete from Drive)
-					// Verify rc.MoveFile logic in rclone.go: it moves file to localDir.
-					if err := rc.MoveFile(file.Name, batchWorkDir); err != nil {
-						logger.Error(i18n.T("drive_dl_move_fail"), file.Name, err)
-						failCount++
-						continue
-					}
-					downloadedFiles = append(downloadedFiles, filepath.Join(batchWorkDir, file.Name))
-				}
-
-				if failCount > 0 {
-					logger.Error("⚠️  Batch %s had %d download failures. Skipping processing to avoid partial data.", ts, failCount)
-					// We leave the downloaded ones there? Or cleanup?
-					// Better leave them for manual inspection or retry.
-					continue
-				}
-
-				// Process Phase
-				// Iterate over downloaded files and process them
-				// Note: `ProcessZip` deletes the zip after processing.
-				// This matches "work/processing" flow.
-				for i, zipPath := range downloadedFiles {
-					logger.Info("[%d/%d] Processing %s...", i+1, len(downloadedFiles), filepath.Base(zipPath))
-					if err := eng.ProcessZip(zipPath); err != nil {
+				// 1. Recover Orphans (Downloaded but not processed/deleted)
+				// If script crashed after download but before delete
+				logger.Info("   - Checking for orphan files...")
+				localBatches, _ := filepath.Glob(filepath.Join(batchWorkDir, "*.zip"))
+				for _, zipPath := range localBatches {
+					if err := batchEng.ProcessZipWithIndex(zipPath, batchWorkDir); err != nil {
 						logger.Error(i18n.T("drive_process_fail"), filepath.Base(zipPath), err)
 					}
 				}
 
-				// Cleanup Batch Dir
-				os.RemoveAll(batchWorkDir)
-				processedBatches++
+				// Sort Drive files
+				sort.Slice(groupFiles, func(i, j int) bool {
+					return groupFiles[i].Name < groupFiles[j].Name
+				})
+
+				// 2. Sequential Pipeline (Download -> Process -> Delete)
+				failed := false
+				for i, file := range groupFiles {
+					// Skip Signal File (Process Last)
+					if file.Name == signalFile.Name {
+						continue
+					}
+
+					logger.Info(i18n.T("drive_download_prog"), i+1, len(groupFiles), file.Name)
+
+					// Check if already processed (not in Drive? logic is: iterate Drive files)
+					// If it is in `groupFiles`, it IS in Drive. So it needs processing.
+
+					// Resume Cleanup: Remove partial downloads
+					partial := filepath.Join(batchWorkDir, file.Name+".crdownload") // rclone partial?
+					os.Remove(partial)                                              // just in case
+
+					// Download (Move)
+					// Verify rc.MoveFile logic in rclone.go: it moves file to localDir.
+					if err := rc.MoveFile(file.Name, batchWorkDir); err != nil {
+						logger.Error(i18n.T("drive_dl_move_fail"), file.Name, err)
+						failed = true
+						continue // Skip processing this file
+					}
+
+					// Process immediately
+					localPath := filepath.Join(batchWorkDir, file.Name)
+					if err := batchEng.ProcessZipWithIndex(localPath, batchWorkDir); err != nil {
+						logger.Error(i18n.T("drive_process_fail"), file.Name, err)
+						failed = true
+					}
+				}
+
+				if failed {
+					logger.Error("⚠️  Batch %s had failures. Stopping before Signal File to allow retry.", ts)
+					continue
+				}
+
+				// 3. Process Signal File (Last)
+				// If we are here, all content files are processed and deleted from Drive.
+				logger.Info("🏁 Processing Signal File: %s", signalFile.Name)
+
+				// It might be the ONLY file (if len=1, loop above was skipped)
+				// Download Signal
+				if err := rc.MoveFile(signalFile.Name, batchWorkDir); err != nil {
+					logger.Error(i18n.T("drive_dl_move_fail"), signalFile.Name, err)
+					continue
+				}
+
+				// Process Signal
+				localPath := filepath.Join(batchWorkDir, signalFile.Name)
+				if err := batchEng.ProcessZipWithIndex(localPath, batchWorkDir); err != nil {
+					logger.Error(i18n.T("drive_process_fail"), signalFile.Name, err)
+					continue
+				}
+
+				// 4. Finalize Batch
+				if err := batchEng.Finalize(); err != nil {
+					logger.Error(i18n.T("drive_final_fail"), err)
+				} else {
+					logger.Info(i18n.T("drive_processed_success"))
+					updateHistorySuccess()
+
+					// Cleanup Batch Dir (Index, empty extracted)
+					os.RemoveAll(batchWorkDir)
+					processedBatches++
+				}
 			}
 
 			// Finalize Engine (Shared Phase)

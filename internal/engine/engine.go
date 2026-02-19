@@ -2,6 +2,9 @@ package engine
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +22,6 @@ type Engine struct {
 	WorkingDir string
 	BackupDir  string
 	AlbumsDir  string
-
 	// Config
 	FixAmbiguousMetadata string
 }
@@ -33,25 +35,113 @@ func New(workingDir, backupDir string) *Engine {
 	}
 }
 
-// ProcessZip handles a single zip file: Unzip -> Dedup -> Delete Zip
-func (e *Engine) ProcessZip(zipPath string) error {
-	logger.Info("📦 Processing Zip: %s", filepath.Base(zipPath))
+// BatchIndex maps Hash -> RelativePath (inside extracted dir)
+type BatchIndex map[string]string
 
-	// 1. Unzip to temp/extracted
-	extractDir := filepath.Join(e.WorkingDir, "extracted")
+// LoadBatchIndex loads the index from disk
+func LoadBatchIndex(path string) (BatchIndex, error) {
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return make(BatchIndex), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var idx BatchIndex
+	if err := json.NewDecoder(f).Decode(&idx); err != nil {
+		return make(BatchIndex), nil // Corrupt? Start fresh
+	}
+	return idx, nil
+}
+
+// SaveBatchIndex saves the index to disk
+func (idx BatchIndex) Save(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return json.NewEncoder(f).Encode(idx)
+}
+
+// ProcessZipWithIndex handles a single zip file with incremental deduplication
+func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
+	logger.Info("📦 Processing Zip (Sequential): %s", filepath.Base(zipPath))
+
+	// 1. Unzip to batchDir/extracted
+	extractDir := filepath.Join(batchDir, "extracted")
 	if err := os.MkdirAll(extractDir, 0755); err != nil {
 		return fmt.Errorf("failed to create extract dir: %v", err)
 	}
 
 	logger.Info("   - Extracting...")
-	if err := e.unzip(zipPath, extractDir); err != nil {
+	// We need to know WHICH files were extracted to dedup them specifically
+	extractedFiles, err := e.unzipAndList(zipPath, extractDir)
+	if err != nil {
 		return fmt.Errorf("extraction failed: %v", err)
 	}
 
-	// 2. Delete Zip (Space Saving)
-	logger.Info("   - Deleting Zip to save space...")
-	if err := os.Remove(zipPath); err != nil {
-		logger.Warn("Failed to delete zip %s: %v", zipPath, err)
+	// 2. Incremental Deduplication (Local Batch Index)
+	indexFile := filepath.Join(batchDir, "index.json")
+	batchIndex, err := LoadBatchIndex(indexFile)
+	if err != nil {
+		logger.Warn("Failed to load batch index: %v", err)
+		batchIndex = make(BatchIndex)
+	}
+
+	logger.Info("   - Deduplicating against batch...")
+	filesDeduped := 0
+	for _, relPath := range extractedFiles {
+		fullPath := filepath.Join(extractDir, relPath)
+
+		// Skip directories
+		info, err := os.Stat(fullPath)
+		if err != nil || info.IsDir() {
+			continue
+		}
+
+		// Hash
+		hash, err := hashFile(fullPath)
+		if err != nil {
+			logger.Warn("Failed to hash %s: %v", relPath, err)
+			continue
+		}
+
+		// Check Index
+		if existingRel, ok := batchIndex[hash]; ok {
+			// Collision found!
+			if existingRel != relPath {
+				existingPath := filepath.Join(extractDir, existingRel)
+
+				// Ensure existing file still exists
+				if _, err := os.Stat(existingPath); err == nil {
+					// Link: RelPath -> ExistingPath
+					// Remove current
+					os.Remove(fullPath)
+					// Hardlink
+					if err := os.Link(existingPath, fullPath); err == nil {
+						filesDeduped++
+					} else {
+						// Fallback to copy? No, just keep it.
+						logger.Warn("Failed to link %s -> %s: %v", relPath, existingRel, err)
+					}
+				} else {
+					// Original missing? Update index to point to new one
+					batchIndex[hash] = relPath
+				}
+			}
+		} else {
+			// Add to Index
+			batchIndex[hash] = relPath
+		}
+	}
+	logger.Info("   - Deduplicated %d files locally.", filesDeduped)
+
+	// Save Index
+	if err := batchIndex.Save(indexFile); err != nil {
+		logger.Warn("Failed to save batch index: %v", err)
 	}
 
 	// 3. Deduplicate against Backup (Optimization: Same Volume Only)
@@ -60,11 +150,26 @@ func (e *Engine) ProcessZip(zipPath string) error {
 		if err := e.deduplicateAgainstBackup(extractDir); err != nil {
 			logger.Warn("Backup deduplication optimization failed: %v", err)
 		}
-	} else {
-		logger.Info("   - Different volumes detected. Skipping backup deduplication check.")
+	}
+
+	// 4. Delete Zip (Space Saving)
+	logger.Info("   - Deleting Zip to save space...")
+	if err := os.Remove(zipPath); err != nil {
+		logger.Warn("Failed to delete zip %s: %v", zipPath, err)
 	}
 
 	return nil
+}
+
+// ProcessZip Legacy wrapper
+func (e *Engine) ProcessZip(zipPath string) error {
+	// Works in e.WorkingDir default
+	// We create a temporary batch dir structure to reuse the logic?
+	// Or just keep the old logic for legacy sync?
+	// Let's implement legacy logic for safety or redirect.
+	// Legacy 'ProcessZip' was used by 'gpb sync' which extracts to 'e.WorkingDir/extracted'.
+	// We can use ProcessZipWithIndex passing e.WorkingDir.
+	return e.ProcessZipWithIndex(zipPath, e.WorkingDir)
 }
 
 // Finalize performs the shared processing on all extracted files set
@@ -123,10 +228,11 @@ func (e *Engine) Finalize() error {
 
 // --- Helpers ---
 
-func (e *Engine) unzip(src, dest string) error {
+func (e *Engine) unzipAndList(src, dest string) ([]string, error) {
+	var extracted []string
 	r, err := zip.OpenReader(src)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer r.Close()
 
@@ -138,24 +244,26 @@ func (e *Engine) unzip(src, dest string) error {
 			continue
 		}
 
+		extracted = append(extracted, f.Name)
+
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(fpath, os.ModePerm)
 			continue
 		}
 
 		if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
-			return err
+			return nil, err
 		}
 
 		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		rc, err := f.Open()
 		if err != nil {
 			outFile.Close()
-			return err
+			return nil, err
 		}
 
 		_, err = io.Copy(outFile, rc)
@@ -163,7 +271,26 @@ func (e *Engine) unzip(src, dest string) error {
 		outFile.Close()
 		rc.Close()
 	}
-	return nil
+	return extracted, nil
+}
+
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func (e *Engine) unzip(src, dest string) error {
+	_, err := e.unzipAndList(src, dest)
+	return err
 }
 
 func (e *Engine) isSameVolume(path1, path2 string) bool {
