@@ -105,6 +105,10 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	if err != nil {
 		logger.Warn("Failed to load batch index: %v", err)
 		batchIndex = registry.NewIndex()
+	} else {
+		if len(batchIndex.Files) > 0 {
+			logger.Info("   - Loaded Batch Index: %d existing files from previous zips.", len(batchIndex.Files))
+		}
 	}
 
 	logger.Info("   - Deduplicating against batch...")
@@ -234,6 +238,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 		batchIndex.AddOrUpdate(entry)
 	}
 	logger.Info("   - Deduplicated: %d (Global Backup) | %d (Batch Local)", filesDedupedGlobal, filesDedupedLocal)
+	logger.Info("   - Batch Index Updated: %d total files tracking.", len(batchIndex.Files))
 
 	// Save Index (Standard Format)
 	if err := batchIndex.Save(indexFile); err != nil {
