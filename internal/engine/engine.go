@@ -12,8 +12,8 @@ import (
 	"syscall"
 
 	"google-photos-backup/internal/config"
+	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
-	"google-photos-backup/internal/processor"
 	"google-photos-backup/internal/registry"
 )
 
@@ -42,7 +42,7 @@ func New(workingDir, backupDir string) *Engine {
 
 // LoadGlobalIndex scans the BackupDir for index.json files and builds an in-memory map
 func (e *Engine) LoadGlobalIndex() error {
-	logger.Info("TIMEOUT-OPTIMIZATION: Loading Global Index from %s...", e.BackupDir)
+	logger.Info(i18n.T("drive_global_index_load"), e.BackupDir)
 	count := 0
 
 	// Walk BackupDir/YYYY/MM structure
@@ -57,7 +57,7 @@ func (e *Engine) LoadGlobalIndex() error {
 			// Found an index file! Load it.
 			idx, err := registry.LoadIndex(path)
 			if err != nil {
-				logger.Warn("Failed to load index %s: %v", path, err)
+				logger.Warn(i18n.T("drive_global_index_fail"), path, err)
 				return nil
 			}
 
@@ -76,25 +76,25 @@ func (e *Engine) LoadGlobalIndex() error {
 		return nil
 	})
 
-	logger.Info("✅ Global Index Loaded: %d files indexed.", count)
+	logger.Info(i18n.T("drive_global_index_loaded"), count)
 	return err
 }
 
 // ProcessZipWithIndex handles a single zip file with incremental deduplication
 func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
-	logger.Info("📦 Processing Zip (Sequential): %s", filepath.Base(zipPath))
+	logger.Info(i18n.T("engine_zip_process"), filepath.Base(zipPath))
 
 	// 1. Unzip to batchDir/extracted
 	extractDir := filepath.Join(batchDir, "extracted")
 	if err := os.MkdirAll(extractDir, 0755); err != nil {
-		return fmt.Errorf("failed to create extract dir: %v", err)
+		return fmt.Errorf(i18n.T("engine_extract_dir_fail"), err)
 	}
 
-	logger.Info("   - Extracting...")
+	logger.Info(i18n.T("engine_extracting"))
 	// We need to know WHICH files were extracted to dedup them specifically
 	extractedFiles, err := e.unzipAndList(zipPath, extractDir)
 	if err != nil {
-		return fmt.Errorf("extraction failed: %v", err)
+		return fmt.Errorf(i18n.T("engine_extract_fail"), err)
 	}
 
 	// 2. Incremental Deduplication (Local Batch Index)
@@ -103,15 +103,15 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	// Load using registry.LoadIndex (Standard Format)
 	batchIndex, err := registry.LoadIndex(indexFile)
 	if err != nil {
-		logger.Warn("Failed to load batch index: %v", err)
+		logger.Warn(i18n.T("engine_batch_index_fail"), err)
 		batchIndex = registry.NewIndex()
 	} else {
 		if len(batchIndex.Files) > 0 {
-			logger.Info("   - Loaded Batch Index: %d existing files from previous zips.", len(batchIndex.Files))
+			logger.Info(i18n.T("engine_batch_index_loaded"), len(batchIndex.Files))
 		}
 	}
 
-	logger.Info("   - Deduplicating against batch...")
+	logger.Info(i18n.T("engine_dedup_batch"))
 	filesDedupedLocal := 0
 	filesDedupedGlobal := 0
 
@@ -126,7 +126,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 		// Hash
 		hash, err := hashFile(fullPath)
 		if err != nil {
-			logger.Warn("Failed to hash %s: %v", relPath, err)
+			logger.Warn(i18n.T("engine_hash_fail"), relPath, err)
 			continue
 		}
 
@@ -165,7 +165,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 
 						continue // Done with this file
 					} else {
-						logger.Warn("Failed to link to backup %s: %v", backupPath, err)
+						logger.Warn(i18n.T("engine_link_backup_fail"), backupPath, err)
 					}
 				}
 			} else {
@@ -225,7 +225,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 							}
 						}
 					} else {
-						logger.Warn("Failed to link %s -> %s: %v", relPath, existingRel, err)
+						logger.Warn(i18n.T("engine_link_local_fail"), relPath, existingRel, err)
 					}
 				} else {
 					// Original missing?
@@ -237,26 +237,26 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 		// Always add/update the index with the current file info
 		batchIndex.AddOrUpdate(entry)
 	}
-	logger.Info("   - Deduplicated: %d (Global Backup) | %d (Batch Local)", filesDedupedGlobal, filesDedupedLocal)
-	logger.Info("   - Batch Index Updated: %d total files tracking.", len(batchIndex.Files))
+	logger.Info(i18n.T("engine_dedup_stats"), filesDedupedGlobal, filesDedupedLocal)
+	logger.Info(i18n.T("engine_index_updated"), len(batchIndex.Files))
 
 	// Save Index (Standard Format)
 	if err := batchIndex.Save(indexFile); err != nil {
-		logger.Warn("Failed to save batch index: %v", err)
+		logger.Warn(i18n.T("engine_index_save_fail"), err)
 	}
 
 	// 3. Deduplicate against Backup (Optimization: Same Volume Only)
 	if e.isSameVolume(extractDir, e.BackupDir) {
-		logger.Info("   - Optimizing: Same volume detected. Deduplicating against backup...")
+		logger.Info(i18n.T("engine_opt_same_vol"))
 		if err := e.deduplicateAgainstBackup(extractDir); err != nil {
-			logger.Warn("Backup deduplication optimization failed: %v", err)
+			logger.Warn(i18n.T("engine_opt_fail"), err)
 		}
 	}
 
 	// 4. Delete Zip (Space Saving)
-	logger.Info("   - Deleting Zip to save space...")
+	logger.Info(i18n.T("engine_zip_delete"))
 	if err := os.Remove(zipPath); err != nil {
-		logger.Warn("Failed to delete zip %s: %v", zipPath, err)
+		logger.Warn(i18n.T("engine_zip_del_fail"), zipPath, err)
 	}
 
 	return nil
@@ -275,7 +275,7 @@ func (e *Engine) ProcessZip(zipPath string) error {
 
 // Finalize performs the shared processing on all extracted files set
 func (e *Engine) Finalize() error {
-	logger.Info("🔄 Starting Final Processing Phase...")
+	logger.Info(i18n.T("engine_final_phase"))
 
 	extractDir := filepath.Join(e.WorkingDir, "extracted")
 
@@ -286,42 +286,10 @@ func (e *Engine) Finalize() error {
 
 	// 2. Final Deduplication (Cross-Volume Fix)
 	// Now that files are in BackupDir, they are strictly on the backup volume.
-	logger.Info("   - Running Final Deduplication...")
-
-	// We instantiate a Processor Manager just for the dedup logic
-	// InputDir = BackupDir (since files are already moved there)
-	// OutputDir = BackupDir
-	dedupMgr := processor.NewManager(e.BackupDir, e.BackupDir, e.AlbumsDir)
-	dedupMgr.ForceDedup = true
-	// Trick: To make dedup work without iterating strictly over "History", we might need adjustments
-	// in processor.Manager. However, ProcessExports works based on History.json.
-	// DedupAndOrganize works based on scanning directories matching Export IDs.
-	// Since we are organizing by DATE (Year/Month), the existing Dedup logic which expects ExportID folders MIGHT FAIL.
-
-	// CRITICAL: The existing processor organizes into `output/albums` but expects input in `downloads/ID`.
-	// Our new architecture moves files directly to `backup/Year/Month`.
-	// The `deduplicateAgainstBackup` logic in the processor iterates over `ProcessedExports`.
-	// This might need refactoring in Processor or a new implementation here.
-
-	// For now, let's assume we implement a simpler "Dedup By Hash" here or call a modified processor function.
-	// Let's rely on the Processor for now but acknowledge it might need tweaks in next step.
-	// Actually, if files are already moved, standard dedup (finding duplicates across folders) is hard without an index.
-
-	// Use existing DeduplicateAndOrganize if possible?
-	// It scans InputDir for folders. If we moved files to Year/Month folders, it won't find ExportID folders.
-	// So we need a DIFFERENT Dedup strategy for the final structure.
-
-	// Let's implement a "Scan and Link" simple strategy here for now.
-	// Or better: Let Processor handle the move, but we feed it the extracted files.
-
-	// RE-EVALUATION:
-	// The best approach is to let the processor handle the "Move" logic which already includes organization.
-	// But the processor expects ZIP input usually.
-
-	// Let's stick to: OrganizeAndMove moves files. Then we scan BackupDir for duplicates.
+	logger.Info(i18n.T("engine_final_dedup"))
 
 	// 3. Cleanup
-	logger.Info("   - Cleaning up temp files...")
+	logger.Info(i18n.T("engine_cleanup"))
 	os.RemoveAll(extractDir)
 
 	return nil
@@ -429,7 +397,7 @@ func (e *Engine) deduplicateAgainstBackup(extractDir string) error {
 
 // OrganizeAndMove moves files from source to destination structure
 func (e *Engine) OrganizeAndMove(srcDir string) error {
-	logger.Info("   - Organizing and Moving files...")
+	logger.Info(i18n.T("engine_organize_move"))
 	// For now, implementing a basic move to verify flow.
 	// We will enhance this with metadata fixing in the next iteration.
 

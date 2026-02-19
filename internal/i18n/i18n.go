@@ -799,9 +799,166 @@ var messages = map[string]map[string]string{
 		"en": "Use 'gpb drive' to process these exports automatically.",
 		"es": "Usa 'gpb drive' para procesar estas exportaciones automáticamente.",
 	},
-	"browser_selecting_drive": {
-		"en": "📂 Selecting 'Add to Drive'...",
-		"es": "📂 Seleccionando 'Añadir a Drive'...",
+	// --- Drive Pipeline (New) ---
+	"drive_global_index_load": {
+		"en": "TIMEOUT-OPTIMIZATION: Loading Global Index from %s...",
+		"es": "OPTIMIZACIÓN: Cargando Índice Global desde %s...",
+	},
+	"drive_global_index_fail": {
+		"en": "Failed to load global index: %v",
+		"es": "Fallo al cargar índice global: %v",
+	},
+	"drive_global_index_loaded": {
+		"en": "✅ Global Index Loaded: %d files indexed.",
+		"es": "✅ Índice Global Cargado: %d ficheros indexados.",
+	},
+	"drive_batch_found": {
+		"en": "📂 Found %d potential batches in Drive.",
+		"es": "📂 Encontrados %d lotes potenciales en Drive.",
+	},
+	"drive_batch_analyze": {
+		"en": "   - Analyzing batch: %s (%d files)",
+		"es": "   - Analizando lote: %s (%d ficheros)",
+	},
+	"drive_batch_skip": {
+		"en": "File %s does not match expected pattern, skipping batch grouping.",
+		"es": "El archivo %s no coincide con el patrón esperado, saltando agrupación.",
+	},
+	"drive_batch_not_ready": {
+		"en": "   - Batch %s NOT READY (Waiting for -001.zip signal). Skipping.",
+		"es": "   - Lote %s NO LISTO (Esperando señal -001.zip). Saltando.",
+	},
+	"drive_batch_ready": {
+		"en": "✅ Batch %s is READY. Processing...",
+		"es": "✅ Lote %s LISTO. Procesando...",
+	},
+	"drive_batch_mkdir_fail": {
+		"en": "Failed to create batch dir: %v",
+		"es": "Fallo al crear directorio del lote: %v",
+	},
+	"drive_orphans_check": {
+		"en": "   - Checking for orphan files...",
+		"es": "   - Buscando archivos huérfanos...",
+	},
+	"drive_resume_index": {
+		"en": "🔄 Resuming Batch: Found local index with %d files processed.",
+		"es": "🔄 Reanudando Lote: Encontrado índice local con %d ficheros procesados.",
+	},
+	"drive_batch_failures": {
+		"en": "⚠️  Batch %s had failures. Stopping before Signal File to allow retry.",
+		"es": "⚠️  El lote %s tuvo fallos. Parando antes del Fichero Señal para permitir reintento.",
+	},
+	"drive_signal_process": {
+		"en": "🏁 Processing Signal File: %s",
+		"es": "🏁 Procesando Fichero Señal: %s",
+	},
+	"drive_no_ready_batches": {
+		"en": "ℹ️  Files found but no batches were ready to process.",
+		"es": "ℹ️  Archivos encontrados pero ningún lote estaba listo para procesar.",
+	},
+	"engine_zip_process": {
+		"en": "📦 Processing Zip (Sequential): %s",
+		"es": "📦 Procesando Zip (Secuencial): %s",
+	},
+	"engine_extract_dir_fail": {
+		"en": "failed to create extract dir: %v",
+		"es": "fallo al crear directorio de extracción: %v",
+	},
+	"engine_extracting": {
+		"en": "   - Extracting...",
+		"es": "   - Extrayendo...",
+	},
+	"engine_extract_fail": {
+		"en": "extraction failed: %v",
+		"es": "extracción fallida: %v",
+	},
+	"engine_batch_index_fail": {
+		"en": "Failed to load batch index: %v",
+		"es": "Fallo al cargar índice del lote: %v",
+	},
+	"engine_batch_index_loaded": {
+		"en": "   - Loaded Batch Index: %d existing files from previous zips.",
+		"es": "   - Índice de Lote Cargado: %d ficheros existentes de zips previos.",
+	},
+	"engine_dedup_batch": {
+		"en": "   - Deduplicating against batch...",
+		"es": "   - Deduplicando contra el lote...",
+	},
+	"engine_hash_fail": {
+		"en": "Failed to hash %s: %v",
+		"es": "Fallo al hashear %s: %v",
+	},
+	"engine_link_backup_fail": {
+		"en": "Failed to link to backup %s: %v",
+		"es": "Fallo al enlazar al backup %s: %v",
+	},
+	"engine_link_local_fail": {
+		"en": "Failed to link %s -> %s: %v",
+		"es": "Fallo al enlazar %s -> %s: %v",
+	},
+	"engine_dedup_stats": {
+		"en": "   - Deduplicated: %d (Global Backup) | %d (Batch Local)",
+		"es": "   - Deduplicado: %d (Backup Global) | %d (Lote Local)",
+	},
+	"engine_index_updated": {
+		"en": "   - Batch Index Updated: %d total files tracking.",
+		"es": "   - Índice de Lote Actualizado: %d ficheros rastreados.",
+	},
+	"engine_index_save_fail": {
+		"en": "Failed to save batch index: %v",
+		"es": "Fallo al guardar índice del lote: %v",
+	},
+	"engine_opt_same_vol": {
+		"en": "   - Optimizing: Same volume detected. Deduplicating against backup...",
+		"es": "   - Optimizando: Mismo volumen detectado. Deduplicando contra backup...",
+	},
+	"engine_opt_fail": {
+		"en": "Backup deduplication optimization failed: %v",
+		"es": "Optimización de deduplicación contra backup falló: %v",
+	},
+	"engine_zip_delete": {
+		"en": "   - Deleting Zip to save space...",
+		"es": "   - Borrando Zip para ahorrar espacio...",
+	},
+	"engine_zip_del_fail": {
+		"en": "Failed to delete zip %s: %v",
+		"es": "Fallo al borrar zip %s: %v",
+	},
+	"engine_final_phase": {
+		"en": "🔄 Starting Final Processing Phase...",
+		"es": "🔄 Iniciando Fase Final de Procesamiento...",
+	},
+	"engine_final_dedup": {
+		"en": "   - Running Final Deduplication...",
+		"es": "   - Ejecutando Deduplicación Final...",
+	},
+	"engine_organize_move": {
+		"en": "   - Organizing and Moving files...",
+		"es": "   - Organizando y Moviendo ficheros...",
+	},
+	"engine_cleanup": {
+		"en": "   - Cleaning up temp files...",
+		"es": "   - Limpiando ficheros temporales...",
+	},
+	"engine_index_load_sub_fail": {
+		"en": "Failed to load index %s: %v",
+		"es": "Fallo al cargar índice %s: %v",
+	},
+	"drive_auto_renew_head": {
+		"en": "🔄 Attempting auto-renewal of Takeout schedule (Headless)...",
+		"es": "🔄 Intentando auto-renovación programada de Takeout (Headless)...",
+	},
+	"drive_auto_renew_success": {
+		"en": "✅ Auto-renewal successful! Google should prepare a new export soon.",
+		"es": "✅ ¡Auto-renovación exitosa! Google preparará una nueva exportación pronto.",
+	},
+	"drive_auto_renew_fail": {
+		"en": "Auto-renewal failed: %v",
+		"es": "Auto-renovación fallida: %v",
+	},
+	"drive_auto_renew_skip": {
+		"en": "Auto-renewal skipped: Session invalid.",
+		"es": "Auto-renovación saltada: Sesión inválida.",
 	},
 	"browser_selecting_freq": {
 		"en": "⏰ Selecting 'Export every 2 months'...",

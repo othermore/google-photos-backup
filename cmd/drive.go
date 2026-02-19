@@ -48,7 +48,7 @@ var driveCmd = &cobra.Command{
 
 		// Load Global Index ONCE for the session
 		if err := eng.LoadGlobalIndex(); err != nil {
-			logger.Warn("Failed to load global index: %v", err)
+			logger.Warn(i18n.T("drive_global_index_fail"), err)
 		}
 
 		processedBatches := 0
@@ -67,15 +67,15 @@ var driveCmd = &cobra.Command{
 					ts := matches[1]
 					groups[ts] = append(groups[ts], f)
 				} else {
-					logger.Warn("File %s does not match expected pattern, skipping batch grouping.", f.Name)
+					logger.Warn(i18n.T("drive_batch_skip"), f.Name)
 				}
 			}
 
-			logger.Info("📂 Found %d potential batches in Drive.", len(groups))
+			logger.Info(i18n.T("drive_batch_found"), len(groups))
 
 			// Process each group
 			for ts, groupFiles := range groups {
-				logger.Info("   - Analyzing batch: %s (%d files)", ts, len(groupFiles))
+				logger.Info(i18n.T("drive_batch_analyze"), ts, len(groupFiles))
 
 				// Ready Check: Look for ...-001.zip (Signal)
 				var signalFile *rclone.File
@@ -93,16 +93,16 @@ var driveCmd = &cobra.Command{
 					if len(groupFiles) == 1 && strings.HasSuffix(groupFiles[0].Name, ".zip") {
 						signalFile = &groupFiles[0] // Treat as signal (it's the only one)
 					} else {
-						logger.Info("   - Batch %s NOT READY (Waiting for -001.zip signal). Skipping.", ts)
+						logger.Info(i18n.T("drive_batch_not_ready"), ts)
 						continue
 					}
 				}
 
-				logger.Info("✅ Batch %s is READY. Processing...", ts)
+				logger.Info(i18n.T("drive_batch_ready"), ts)
 
 				batchWorkDir := filepath.Join(config.AppConfig.WorkingPath, "processing", ts)
 				if err := os.MkdirAll(batchWorkDir, 0755); err != nil {
-					logger.Error("Failed to create batch dir: %v", err)
+					logger.Error(i18n.T("drive_batch_mkdir_fail"), err)
 					continue
 				}
 
@@ -115,12 +115,12 @@ var driveCmd = &cobra.Command{
 				// Resume Info: Check if we have an existing index
 				indexPath := filepath.Join(batchWorkDir, "index.json")
 				if idx, err := registry.LoadIndex(indexPath); err == nil && len(idx.Files) > 0 {
-					logger.Info("🔄 Resuming Batch: Found local index with %d files processed.", len(idx.Files))
+					logger.Info(i18n.T("drive_resume_index"), len(idx.Files))
 				}
 
 				// 1. Recover Orphans (Downloaded but not processed/deleted)
 				// If script crashed after download but before delete
-				logger.Info("   - Checking for orphan files...")
+				logger.Info(i18n.T("drive_orphans_check"))
 				localBatches, _ := filepath.Glob(filepath.Join(batchWorkDir, "*.zip"))
 				for _, zipPath := range localBatches {
 					if err := batchEng.ProcessZipWithIndex(zipPath, batchWorkDir); err != nil {
@@ -167,13 +167,13 @@ var driveCmd = &cobra.Command{
 				}
 
 				if failed {
-					logger.Error("⚠️  Batch %s had failures. Stopping before Signal File to allow retry.", ts)
+					logger.Error(i18n.T("drive_batch_failures"), ts)
 					continue
 				}
 
 				// 3. Process Signal File (Last)
 				// If we are here, all content files are processed and deleted from Drive.
-				logger.Info("🏁 Processing Signal File: %s", signalFile.Name)
+				logger.Info(i18n.T("drive_signal_process"), signalFile.Name)
 
 				// It might be the ONLY file (if len=1, loop above was skipped)
 				// Download Signal
@@ -219,7 +219,7 @@ var driveCmd = &cobra.Command{
 			if len(files) == 0 {
 				logger.Info(i18n.T("drive_no_files"))
 			} else {
-				logger.Info("ℹ️  Files found but no batches were ready to process.")
+				logger.Info(i18n.T("drive_no_ready_batches"))
 			}
 			checkStaleAndAlert()
 		}
@@ -271,7 +271,7 @@ func checkStaleAndAlert() {
 		}
 
 		// Attempt Auto-Renewal (Headless Schedule)
-		logger.Info("🔄 Attempting auto-renewal of Takeout schedule (Headless)...")
+		logger.Info(i18n.T("drive_auto_renew_head"))
 
 		userDataDir := filepath.Join(config.AppConfig.WorkingPath, "browser_data")
 		// Headless = true
@@ -281,7 +281,7 @@ func checkStaleAndAlert() {
 		// Verify Session & Schedule
 		if bm.VerifySession() {
 			if err := bm.ScheduleRecurringTakeout(); err == nil {
-				logger.Info("✅ Auto-renewal successful! Google should prepare a new export soon.")
+				logger.Info(i18n.T("drive_auto_renew_success"))
 				// We treat this as a "partial success" to reset alert timer?
 				// Or update history "RequestedAt"?
 				// Let's just NOT alert.
@@ -296,10 +296,10 @@ func checkStaleAndAlert() {
 				reg.Save()
 				return
 			} else {
-				logger.Warn("Auto-renewal failed: %v", err)
+				logger.Warn(i18n.T("drive_auto_renew_fail"), err)
 			}
 		} else {
-			logger.Warn("Auto-renewal skipped: Session invalid.")
+			logger.Warn(i18n.T("drive_auto_renew_skip"))
 		}
 
 		// Fallback: Send Alert Email
