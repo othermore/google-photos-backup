@@ -29,8 +29,9 @@ const (
 
 // Manager manages the browser instance and session
 type Manager struct {
-	Browser *rod.Browser
-	DataDir string // Directory to save cookies and session
+	Browser  *rod.Browser
+	DataDir  string // Directory to save cookies and session
+	Headless bool
 }
 
 // New creates a new browser manager instance
@@ -104,8 +105,9 @@ func New(userDataDir string, headless bool) *Manager {
 	go router.Run()
 
 	return &Manager{
-		Browser: browser,
-		DataDir: userDataDir,
+		Browser:  browser,
+		DataDir:  userDataDir,
+		Headless: headless,
 	}
 }
 
@@ -1344,6 +1346,10 @@ func (m *Manager) ScheduleRecurringTakeout() error {
 		logger.Info(i18n.T("browser_redirect_success"))
 	} else {
 		// If not redirected, we are likely in an Auth Challenge or stuck
+		if m.Headless {
+			return fmt.Errorf("headless mode: automated schedule failed (likely auth required)")
+		}
+
 		fmt.Println("\n" + strings.Repeat("=", 60))
 		fmt.Println(i18n.T("browser_auth_required_title"))
 		fmt.Println(strings.Repeat("=", 60))

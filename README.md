@@ -73,6 +73,8 @@ Run this **once** to configure Google Takeout to export your photos to Drive eve
 **Step B: Unattended Drive Sync**
 Run this command via **Cron** (e.g., daily). It checks your Drive for new exports, downloads them, processes them, and deletes them from Drive to save cloud space.
 
+> **Note**: It intelligently groups files by timestamp and **waits for the full export** (detected by the presence of the `...-001.zip` file) before downloading.
+
 ```bash
 ./gpb drive
 ```
@@ -99,7 +101,7 @@ The tool organizes files into a `Backup/YYYY/MM` structure.
 
 *   **Google Login**: If `schedule` or `sync` hangs at login, run `gpb configure` and chose "Yes" to login interactively.
 *   **Rclone**: Ensure `rclone lsd remote:` works before running `gpb drive`.
-*   **Stale Backups**: If you haven't backed up in >30 days, `gpb drive` will try to send an email alert if configured.
+*   **Stale Backups**: If you haven't backed up in >90 days, `gpb drive` will first try to **auto-renew** the schedule (headless, often works without Passkey). If that fails, it will send an email alert.
 
 ## Credits
 Developed by http://antonio.mg with the help of gemini

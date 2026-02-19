@@ -74,6 +74,8 @@ Ejecuta esto **una vez** para configurar Google Takeout para exportar tus fotos 
 **Paso B: Sincronización Desatendida de Drive**
 Ejecuta este comando vía **Cron** (ej. diariamente). Revisa tu Drive buscando nuevas exportaciones, las descarga, procesa y borra de Drive para ahorrar espacio en la nube.
 
+> **Nota**: Agrupa inteligentemente los archivos por fecha y **espera a que la exportación esté completa** (detectada por la presencia del archivo `...-001.zip`) antes de descargar.
+
 ```bash
 ./gpb drive
 ```
@@ -100,7 +102,7 @@ La herramienta organiza los archivos en una estructura `Backup/AAAA/MM`.
 
 *   **Login de Google**: Si `schedule` o `sync` se atascan en el login, ejecuta `gpb configure` y elige "Sí" para iniciar sesión interactivamente.
 *   **Rclone**: Asegúrate de que `rclone lsd remote:` funciona antes de ejecutar `gpb drive`.
-*   **Backups Obsoletos**: Si no has hecho copia en >30 días, `gpb drive` intentará enviar una alerta por email si está configurado.
+*   **Backups Obsoletos**: Si no has hecho copia en >90 días, `gpb drive` intentará primero **auto-renovar** la programación (headless, a menudo funciona sin Passkey). Si falla, enviará una alerta por email.
 
 ## Créditos
 

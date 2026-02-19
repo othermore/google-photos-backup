@@ -11,6 +11,7 @@ import (
 type ExportStatus string
 
 const (
+	StatusPending     ExportStatus = "pending" // Auto-renewal requested or waiting
 	StatusRequested   ExportStatus = "requested"
 	StatusInProgress  ExportStatus = "in_progress"
 	StatusReady       ExportStatus = "ready"       // Ready to download
