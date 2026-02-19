@@ -108,7 +108,9 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	}
 
 	logger.Info("   - Deduplicating against batch...")
-	filesDeduped := 0
+	filesDedupedLocal := 0
+	filesDedupedGlobal := 0
+
 	for _, relPath := range extractedFiles {
 		fullPath := filepath.Join(extractDir, relPath)
 
@@ -135,7 +137,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 					// Great! Hardlink to backup
 					os.Remove(fullPath)
 					if err := os.Link(backupPath, fullPath); err == nil {
-						filesDeduped++
+						filesDedupedGlobal++
 						// We can skip adding to batchIndex?
 						// NO. We MUST add to batchIndex so subsequent files in this batch
 						// that match this hash ALSO link to this (now linked) file.
@@ -208,7 +210,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 					// Link: RelPath -> ExistingPath
 					os.Remove(fullPath)
 					if err := os.Link(existingPath, fullPath); err == nil {
-						filesDeduped++
+						filesDedupedLocal++
 						// Update inode in entry to match the linked one?
 						// Actually, we should probably store the NEW entry too, pointing to its path?
 						// Or just rely on the fact it matches?
@@ -231,7 +233,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 		// Always add/update the index with the current file info
 		batchIndex.AddOrUpdate(entry)
 	}
-	logger.Info("   - Deduplicated %d files locally.", filesDeduped)
+	logger.Info("   - Deduplicated: %d (Global Backup) | %d (Batch Local)", filesDedupedGlobal, filesDedupedLocal)
 
 	// Save Index (Standard Format)
 	if err := batchIndex.Save(indexFile); err != nil {
