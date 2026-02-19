@@ -22,6 +22,10 @@ type Engine struct {
 	WorkingDir string
 	BackupDir  string
 	AlbumsDir  string
+
+	// Global Index (Hash -> Absolute Path) for Cross-Volume Dedup
+	GlobalIndex map[string]string
+
 	// Config
 	FixAmbiguousMetadata string
 }
@@ -32,7 +36,48 @@ func New(workingDir, backupDir string) *Engine {
 		BackupDir:            backupDir,
 		AlbumsDir:            filepath.Join(backupDir, "albums"),
 		FixAmbiguousMetadata: config.AppConfig.FixAmbiguousMetadata,
+		GlobalIndex:          make(map[string]string),
 	}
+}
+
+// LoadGlobalIndex scans the BackupDir for index.json files and builds an in-memory map
+func (e *Engine) LoadGlobalIndex() error {
+	logger.Info("TIMEOUT-OPTIMIZATION: Loading Global Index from %s...", e.BackupDir)
+	count := 0
+
+	// Walk BackupDir/YYYY/MM structure
+	err := filepath.Walk(e.BackupDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if info.Name() == "index.json" {
+			// Found an index file! Load it.
+			idx, err := registry.LoadIndex(path)
+			if err != nil {
+				logger.Warn("Failed to load index %s: %v", path, err)
+				return nil
+			}
+
+			// Dir of this index (e.g. Backup/2015/10)
+			dir := filepath.Dir(path)
+
+			for _, entry := range idx.Files {
+				// We map Hash -> Absolute Path
+				// entry.RelPath is relative to the index location?
+				// Usually index.json stores relative paths to the folder it's in.
+				absPath := filepath.Join(dir, entry.RelPath)
+				e.GlobalIndex[entry.Hash] = absPath
+				count++
+			}
+		}
+		return nil
+	})
+
+	logger.Info("✅ Global Index Loaded: %d files indexed.", count)
+	return err
 }
 
 // ProcessZipWithIndex handles a single zip file with incremental deduplication
@@ -77,6 +122,50 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 		if err != nil {
 			logger.Warn("Failed to hash %s: %v", relPath, err)
 			continue
+		}
+
+		// OPTIMIZATION: Check Global Index (Backup) First
+		// If we find it in Backup, we link to it immediately and skip local batch logic for this file.
+		if backupPath, ok := e.GlobalIndex[hash]; ok {
+			// Verify it exists
+			if _, err := os.Stat(backupPath); err == nil {
+				// We found it in backup!
+				// Is it same volume?
+				if e.isSameVolume(extractDir, filepath.Dir(backupPath)) {
+					// Great! Hardlink to backup
+					os.Remove(fullPath)
+					if err := os.Link(backupPath, fullPath); err == nil {
+						filesDeduped++
+						// We can skip adding to batchIndex?
+						// NO. We MUST add to batchIndex so subsequent files in this batch
+						// that match this hash ALSO link to this (now linked) file.
+						// The file at fullPath is now a link to backupPath.
+						// So passing fullPath to others is fine.
+
+						// Create Entry for Batch Index
+						entry := registry.FileIndexEntry{
+							RelPath: relPath,
+							Hash:    hash,
+							Size:    info.Size(),
+							ModTime: info.ModTime(),
+						}
+						// Get Inode of the LINKED file
+						if stat, ok := os.Stat(fullPath); ok == nil {
+							if sys, ok := stat.Sys().(*syscall.Stat_t); ok {
+								entry.Inode = sys.Ino
+							}
+						}
+						batchIndex.AddOrUpdate(entry)
+
+						continue // Done with this file
+					} else {
+						logger.Warn("Failed to link to backup %s: %v", backupPath, err)
+					}
+				}
+			} else {
+				// Stale index entry? Remove it?
+				delete(e.GlobalIndex, hash)
+			}
 		}
 
 		// Create Entry

@@ -45,6 +45,12 @@ var driveCmd = &cobra.Command{
 		}
 
 		eng := engine.New(config.AppConfig.WorkingPath, config.AppConfig.BackupPath)
+
+		// Load Global Index ONCE for the session
+		if err := eng.LoadGlobalIndex(); err != nil {
+			logger.Warn("Failed to load global index: %v", err)
+		}
+
 		processedBatches := 0
 
 		// SCENARIO A: Files Found - Batch Processing
@@ -103,6 +109,8 @@ var driveCmd = &cobra.Command{
 				// Create Engine scoped to this batch directory
 				// This ensures Finalize() looks in batchWorkDir/extracted
 				batchEng := engine.New(batchWorkDir, config.AppConfig.BackupPath)
+				// Share the Global Index (Reference copy)
+				batchEng.GlobalIndex = eng.GlobalIndex
 
 				// 1. Recover Orphans (Downloaded but not processed/deleted)
 				// If script crashed after download but before delete
