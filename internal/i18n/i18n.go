@@ -801,7 +801,7 @@ var messages = map[string]map[string]string{
 	},
 	// --- Drive Pipeline (New) ---
 	"drive_global_index_load": {
-		"en": "TIMEOUT-OPTIMIZATION: Loading Global Index from %s...",
+		"en": "OPTIMIZATION: Loading Global Index from %s...",
 		"es": "OPTIMIZACIÓN: Cargando Índice Global desde %s...",
 	},
 	"drive_global_index_fail": {
