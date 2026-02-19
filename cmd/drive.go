@@ -190,7 +190,7 @@ var driveCmd = &cobra.Command{
 				}
 
 				// 4. Finalize Batch
-				if err := batchEng.Finalize(); err != nil {
+				if err := batchEng.Finalize(ts); err != nil {
 					logger.Error(i18n.T("drive_final_fail"), err)
 				} else {
 					logger.Info(i18n.T("drive_processed_success"))
@@ -204,7 +204,7 @@ var driveCmd = &cobra.Command{
 
 			// Finalize Engine (Shared Phase)
 			if processedBatches > 0 {
-				if err := eng.Finalize(); err != nil {
+				if err := eng.Finalize(""); err != nil {
 					logger.Error(i18n.T("drive_final_fail"), err)
 				} else {
 					logger.Info(i18n.T("drive_processed_success"))

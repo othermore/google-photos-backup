@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
+	"google-photos-backup/internal/processor"
 	"google-photos-backup/internal/registry"
 )
 
@@ -266,21 +268,106 @@ func (e *Engine) ProcessZip(zipPath string) error {
 }
 
 // Finalize performs the shared processing on all extracted files set
-func (e *Engine) Finalize() error {
+func (e *Engine) Finalize(snapshotName string) error {
 	logger.Info(i18n.T("engine_final_phase"))
 
-	extractDir := filepath.Join(e.WorkingDir, "extracted")
+	if snapshotName == "" {
+		snapshotName = time.Now().Format("2006-01-02-150405")
+	}
 
-	// 1. Organize and Move (includes Metadata fix)
-	if err := e.OrganizeAndMove(extractDir); err != nil {
+	extractDir := filepath.Join(e.WorkingDir, "extracted")
+	if _, err := os.Stat(extractDir); os.IsNotExist(err) {
+		return nil // Nothing to finalize
+	}
+
+	// 1. Metadata Fix
+	logger.Info("📅 Applying metadata fixes from JSON sidecars...")
+	pm := processor.NewManager(extractDir, extractDir, e.AlbumsDir)
+	pm.FixAmbiguousMetadata = e.FixAmbiguousMetadata
+	if err := pm.ScanRaw(extractDir, false); err == nil {
+		pm.CorrectMetadata()
+	}
+
+	// 2. Move to Snapshot directory
+	snapshotDir := filepath.Join(e.BackupDir, snapshotName)
+	logger.Info("📦 Moving processed files to snapshot: %s", snapshotDir)
+	if err := os.MkdirAll(snapshotDir, 0755); err != nil {
 		return err
 	}
 
-	// 2. Final Deduplication (Cross-Volume Fix)
-	// Now that files are in BackupDir, they are strictly on the backup volume.
-	logger.Info(i18n.T("engine_final_dedup"))
+	err := filepath.Walk(extractDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || path == extractDir {
+			return err
+		}
 
-	// 3. Cleanup
+		relPath, _ := filepath.Rel(extractDir, path)
+		destPath := filepath.Join(snapshotDir, relPath)
+
+		if info.IsDir() {
+			os.MkdirAll(destPath, 0755)
+			return nil
+		}
+
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return err
+		}
+
+		// Move file
+		if err := os.Rename(path, destPath); err != nil {
+			// Cross-device fallback
+			input, err := os.ReadFile(path)
+			if err == nil {
+				if err := os.WriteFile(destPath, input, info.Mode()); err == nil {
+					os.Chtimes(destPath, info.ModTime(), info.ModTime())
+					os.Remove(path)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Error("Failed to move files to snapshot: %v", err)
+	}
+
+	// Generate and Save Snapshot Index
+	logger.Info("📝 Generating snapshot index...")
+
+	// Load batch index to use as cache (prevents rehashing!)
+	batchIndexPath := filepath.Join(e.WorkingDir, "index.json")
+	batchIndex, _ := registry.LoadIndex(batchIndexPath) // If error, nil is fine
+
+	snapIdx, err := processor.EnsureSnapshotIndex(snapshotDir, batchIndex)
+	if err != nil {
+		logger.Warn("Failed to generate snapshot index: %v", err)
+	}
+
+	// 3. Immich Master Integration
+	immichEnabled := config.AppConfig.ImmichMasterEnabled
+	if immichEnabled {
+		immichPath := config.AppConfig.ImmichMasterPath
+		if immichPath == "" {
+			immichPath = "immich-master"
+		}
+		masterRoot := filepath.Join(e.BackupDir, immichPath)
+		logger.Info("📸 Updating Immich Master Directory (%s)...", immichPath)
+
+		masterIndexPath := filepath.Join(masterRoot, "index.json")
+		masterIndex, err := registry.LoadIndex(masterIndexPath)
+		if err != nil {
+			masterIndex = registry.NewIndex()
+		}
+		masterHashMap := processor.GetMasterHashMap(masterIndex)
+
+		if err := processor.LinkSnapshotToMaster(snapshotDir, snapIdx, masterRoot, masterIndex, masterHashMap); err != nil {
+			logger.Error("Failed to link new snapshot to master: %v", err)
+		} else {
+			if err := masterIndex.Save(masterIndexPath); err != nil {
+				logger.Error("Failed to save Master Index: %v", err)
+			}
+		}
+	}
+
+	// 4. Cleanup
 	logger.Info(i18n.T("engine_cleanup"))
 	os.RemoveAll(extractDir)
 
@@ -385,50 +472,4 @@ func (e *Engine) deduplicateAgainstBackup(extractDir string) error {
 	// For this iteration, we keep it empty to ensure compilation and basic flow.
 	// The "Optimization" is a nice-to-have we can add once the main pipeline works.
 	return nil
-}
-
-// OrganizeAndMove moves files from source to destination structure
-func (e *Engine) OrganizeAndMove(srcDir string) error {
-	logger.Info(i18n.T("engine_organize_move"))
-	// For now, implementing a basic move to verify flow.
-	// We will enhance this with metadata fixing in the next iteration.
-
-	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if strings.ToLower(filepath.Ext(path)) == ".json" {
-			return nil
-		}
-
-		// Move file to BackupDir/Year/Month/
-		// Determine date (Mock for now, use ModTime)
-		date := info.ModTime()
-		year := date.Format("2006")
-		month := date.Format("01")
-
-		destDir := filepath.Join(e.BackupDir, year, month)
-		if err := os.MkdirAll(destDir, 0755); err != nil {
-			return err
-		}
-
-		destPath := filepath.Join(destDir, info.Name())
-		// Avoid overwrite if exists? Rename with count?
-		// Simple rename for now
-
-		if err := os.Rename(path, destPath); err != nil {
-			// Cross-device link error? Copy and Delete
-			input, err := os.ReadFile(path)
-			if err == nil {
-				if err := os.WriteFile(destPath, input, 0644); err == nil {
-					os.Remove(path)
-				}
-			}
-		}
-
-		return nil
-	})
 }

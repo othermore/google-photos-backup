@@ -21,7 +21,7 @@ func SendAlert(subject, body string) error {
 
 	// Check if msmtp exists
 	if _, err := exec.LookPath("msmtp"); err != nil {
-		return fmt.Errorf(i18n.T("notifier_no_binary"))
+		return fmt.Errorf("%s", i18n.T("notifier_no_binary"))
 	}
 
 	// Construct email message
@@ -36,7 +36,7 @@ func SendAlert(subject, body string) error {
 
 	logger.Info(i18n.T("notifier_sending"), recipient)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf(i18n.T("notifier_fail"), err, string(output))
+		return fmt.Errorf("%s: %v\nOutput: %s", i18n.T("notifier_fail"), err, string(output))
 	}
 
 	return nil

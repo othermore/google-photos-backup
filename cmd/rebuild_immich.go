@@ -85,7 +85,7 @@ var rebuildImmichCmd = &cobra.Command{
 
 			// A. Ensure Index Exists
 			// We can call EnsureSnapshotIndex directly. It will reuse existing index if valid.
-			idx, err := processor.EnsureSnapshotIndex(snapPath)
+			idx, err := processor.EnsureSnapshotIndex(snapPath, nil)
 			if err != nil {
 				logger.Error("Failed to ensure index for %s: %v", snapName, err)
 				continue

@@ -17,14 +17,14 @@ import (
 
 // EnsureSnapshotIndex scans a snapshot directory, generates a file index with hashes,
 // and saves it to index.json. It optimizes by reusing hashes from an existing index
-// if the Inode and ModTime match.
-func EnsureSnapshotIndex(snapshotPath string) (*registry.Index, error) {
+// if the Inode and ModTime match, OR from an optional cacheIndex if provided.
+func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*registry.Index, error) {
 	indexPath := filepath.Join(snapshotPath, "index.json")
 
 	// 1. Load existing index for optimization
 	existingIndex, err := registry.LoadIndex(indexPath)
 	if err != nil {
-		logger.Error("Failed to load existing index (will rebuild): %v", err)
+		logger.Debug("No existing index at %s (will build new)", indexPath)
 		existingIndex = registry.NewIndex()
 	}
 
@@ -59,13 +59,28 @@ func EnsureSnapshotIndex(snapshotPath string) (*registry.Index, error) {
 		}
 
 		hash := ""
-		// Inode Optimization check
-		if existingEntry, ok := existingIndex.Get(relPath); ok {
-			// Check if Inode matches (and ModTime/Size for safety)
-			if existingEntry.Inode == inode &&
-				existingEntry.ModTime.Equal(info.ModTime()) &&
-				existingEntry.Size == info.Size() {
-				hash = existingEntry.Hash
+
+		// Caching Logic:
+		// We DO NOT copy the Inode from the cache because the file has just been moved
+		// and might have crossed a volume boundary (getting a new Inode).
+		// We strictly read the fresh Inode from the filesystem above.
+		// 1. Check external cacheIndex first (Trust it if Size matches)
+		if cacheIndex != nil {
+			if cacheEntry, ok := cacheIndex.Get(relPath); ok {
+				if cacheEntry.Size == info.Size() {
+					hash = cacheEntry.Hash
+				}
+			}
+		}
+
+		// 2. Check local existingIndex (Requires Inode/ModTime/Size match)
+		if hash == "" {
+			if existingEntry, ok := existingIndex.Get(relPath); ok {
+				if existingEntry.Inode == inode &&
+					existingEntry.ModTime.Equal(info.ModTime()) &&
+					existingEntry.Size == info.Size() {
+					hash = existingEntry.Hash
+				}
 			}
 		}
 

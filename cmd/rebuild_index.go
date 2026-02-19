@@ -59,7 +59,7 @@ var rebuildIndexCmd = &cobra.Command{
 			snapPath := filepath.Join(backupPath, snapName)
 			// logger.Info("Indexing snapshot: %s", snapName)
 
-			if _, err := processor.EnsureSnapshotIndex(snapPath); err != nil {
+			if _, err := processor.EnsureSnapshotIndex(snapPath, nil); err != nil {
 				logger.Error("Failed to index %s: %v", snapName, err)
 			} else {
 				successCount++

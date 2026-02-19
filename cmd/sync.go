@@ -521,7 +521,7 @@ var syncCmd = &cobra.Command{
 
 				// FINALIZE Pipeline
 				logger.Info("🔄 Finalizing global processing...")
-				if err := eng.Finalize(); err != nil {
+				if err := eng.Finalize(""); err != nil {
 					logger.Error("❌ Finalization failed: %v", err)
 				} else {
 					logger.Info("✅ All files processed and organized.")

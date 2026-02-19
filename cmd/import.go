@@ -91,7 +91,7 @@ var importCmd = &cobra.Command{
 		}
 
 		// 3. Finalize
-		if err := eng.Finalize(); err != nil {
+		if err := eng.Finalize(""); err != nil {
 			logger.Error(i18n.T("import_final_fail"), err)
 		} else {
 			logger.Info(i18n.T("import_done"))

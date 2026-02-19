@@ -361,7 +361,7 @@ var updateBackupCmd = &cobra.Command{
 			// A. Ensure Index for New Snapshot
 			// We scan the WHOLE snapshot to be safe and robust, using Inode optimization.
 			// This covers 'Added', 'Linked', and 'Internal' files uniformly.
-			snapIdx, err := processor.EnsureSnapshotIndex(snapshotDir)
+			snapIdx, err := processor.EnsureSnapshotIndex(snapshotDir, nil)
 			if err != nil {
 				logger.Error("Failed to generate index for new snapshot: %v", err)
 			} else {
