@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/processor"
+	"google-photos-backup/internal/registry"
 )
 
 // Engine handles the optimized processing pipeline
@@ -33,37 +33,6 @@ func New(workingDir, backupDir string) *Engine {
 		AlbumsDir:            filepath.Join(backupDir, "albums"),
 		FixAmbiguousMetadata: config.AppConfig.FixAmbiguousMetadata,
 	}
-}
-
-// BatchIndex maps Hash -> RelativePath (inside extracted dir)
-type BatchIndex map[string]string
-
-// LoadBatchIndex loads the index from disk
-func LoadBatchIndex(path string) (BatchIndex, error) {
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return make(BatchIndex), nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	var idx BatchIndex
-	if err := json.NewDecoder(f).Decode(&idx); err != nil {
-		return make(BatchIndex), nil // Corrupt? Start fresh
-	}
-	return idx, nil
-}
-
-// SaveBatchIndex saves the index to disk
-func (idx BatchIndex) Save(path string) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(idx)
 }
 
 // ProcessZipWithIndex handles a single zip file with incremental deduplication
@@ -85,10 +54,12 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 
 	// 2. Incremental Deduplication (Local Batch Index)
 	indexFile := filepath.Join(batchDir, "index.json")
-	batchIndex, err := LoadBatchIndex(indexFile)
+
+	// Load using registry.LoadIndex (Standard Format)
+	batchIndex, err := registry.LoadIndex(indexFile)
 	if err != nil {
 		logger.Warn("Failed to load batch index: %v", err)
-		batchIndex = make(BatchIndex)
+		batchIndex = registry.NewIndex()
 	}
 
 	logger.Info("   - Deduplicating against batch...")
@@ -96,7 +67,6 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	for _, relPath := range extractedFiles {
 		fullPath := filepath.Join(extractDir, relPath)
 
-		// Skip directories
 		info, err := os.Stat(fullPath)
 		if err != nil || info.IsDir() {
 			continue
@@ -109,8 +79,37 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 			continue
 		}
 
-		// Check Index
-		if existingRel, ok := batchIndex[hash]; ok {
+		// Create Entry
+		entry := registry.FileIndexEntry{
+			RelPath: relPath,
+			Hash:    hash,
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+		}
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			entry.Inode = stat.Ino
+		}
+
+		// Check Index (Standard Format)
+		// We look up by Hash. existing index is by RelPath (Files map).
+		// We need a reverse lookup or iterate?
+		// registry.Index.Files is map[string]FileIndexEntry where Key is RelPath.
+		// Constructing a Hash map for fast lookup:
+		// TODO: Optimization - Maintain a separate Hash map in memory if too slow.
+		// For now, let's iterate or assume we need to add a "GetByHash" to registry?
+		// Actually, standard registry.Index is Key=RelPath.
+		// BUT for deduplication we need Key=Hash.
+
+		// Let's implement a quick local lookup map from the loaded index
+		existingRel := ""
+		for _, e := range batchIndex.Files {
+			if e.Hash == hash {
+				existingRel = e.RelPath
+				break
+			}
+		}
+
+		if existingRel != "" {
 			// Collision found!
 			if existingRel != relPath {
 				existingPath := filepath.Join(extractDir, existingRel)
@@ -118,28 +117,34 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 				// Ensure existing file still exists
 				if _, err := os.Stat(existingPath); err == nil {
 					// Link: RelPath -> ExistingPath
-					// Remove current
 					os.Remove(fullPath)
-					// Hardlink
 					if err := os.Link(existingPath, fullPath); err == nil {
 						filesDeduped++
+						// Update inode in entry to match the linked one?
+						// Actually, we should probably store the NEW entry too, pointing to its path?
+						// Or just rely on the fact it matches?
+						// Use the existing entry's inode for the new file?
+						if stat, ok := os.Stat(fullPath); ok == nil {
+							if sys, ok := stat.Sys().(*syscall.Stat_t); ok {
+								entry.Inode = sys.Ino
+							}
+						}
 					} else {
-						// Fallback to copy? No, just keep it.
 						logger.Warn("Failed to link %s -> %s: %v", relPath, existingRel, err)
 					}
 				} else {
-					// Original missing? Update index to point to new one
-					batchIndex[hash] = relPath
+					// Original missing?
+					// Just add this new one as the source of truth
 				}
 			}
-		} else {
-			// Add to Index
-			batchIndex[hash] = relPath
 		}
+
+		// Always add/update the index with the current file info
+		batchIndex.AddOrUpdate(entry)
 	}
 	logger.Info("   - Deduplicated %d files locally.", filesDeduped)
 
-	// Save Index
+	// Save Index (Standard Format)
 	if err := batchIndex.Save(indexFile); err != nil {
 		logger.Warn("Failed to save batch index: %v", err)
 	}
