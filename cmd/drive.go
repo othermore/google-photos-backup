@@ -112,6 +112,12 @@ var driveCmd = &cobra.Command{
 				// Share the Global Index (Reference copy)
 				batchEng.GlobalIndex = eng.GlobalIndex
 
+				// Resume Info: Check if we have an existing index
+				indexPath := filepath.Join(batchWorkDir, "index.json")
+				if idx, err := registry.LoadIndex(indexPath); err == nil && len(idx.Files) > 0 {
+					logger.Info("🔄 Resuming Batch: Found local index with %d files processed.", len(idx.Files))
+				}
+
 				// 1. Recover Orphans (Downloaded but not processed/deleted)
 				// If script crashed after download but before delete
 				logger.Info("   - Checking for orphan files...")
