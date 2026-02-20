@@ -189,8 +189,15 @@ var driveCmd = &cobra.Command{
 					continue
 				}
 
+				// Parse timestamp and format it for the Snapshot
+				// Google format: 20260219T122204Z -> Desired: 2026-02-19-122204
+				formattedTs := ts
+				if parsed, err := time.Parse("20060102T150405Z", ts); err == nil {
+					formattedTs = parsed.Format("2006-01-02-150405")
+				}
+
 				// 4. Finalize Batch
-				if err := batchEng.Finalize(ts); err != nil {
+				if err := batchEng.Finalize(formattedTs); err != nil {
 					logger.Error(i18n.T("drive_final_fail"), err)
 				} else {
 					logger.Info(i18n.T("drive_processed_success"))

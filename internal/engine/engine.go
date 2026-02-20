@@ -385,14 +385,22 @@ func (e *Engine) unzipAndList(src, dest string) ([]string, error) {
 	defer r.Close()
 
 	for _, f := range r.File {
-		fpath := filepath.Join(dest, f.Name)
+		// Strip leading "Takeout/" if present to flatten the structure
+		cleanName := strings.TrimPrefix(f.Name, "Takeout/")
+
+		// If it's just the "Takeout/" root folder, skip it
+		if cleanName == "" {
+			continue
+		}
+
+		fpath := filepath.Join(dest, cleanName)
 
 		// ZipSlip check
 		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
 			continue
 		}
 
-		extracted = append(extracted, f.Name)
+		extracted = append(extracted, cleanName)
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(fpath, os.ModePerm)
