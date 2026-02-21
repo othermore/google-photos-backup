@@ -70,7 +70,7 @@ var driveScheduleOnceCmd = &cobra.Command{
 	Long:  `Automatically configures Google Takeout to export Photos to Drive one time, split into 50GB files.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("========================================")
-		fmt.Println(i18n.T("schedule_title")) // Can reuse or add specific title
+		fmt.Println(i18n.T("schedule_once_title"))
 		fmt.Println("========================================")
 
 		if config.AppConfig.WorkingPath == "" {
@@ -103,7 +103,7 @@ var driveScheduleOnceCmd = &cobra.Command{
 			return
 		}
 
-		logger.Info(i18n.T("schedule_complete_msg"))
+		logger.Info(i18n.T("schedule_once_complete_msg"))
 	},
 }
 

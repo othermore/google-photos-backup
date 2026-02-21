@@ -57,7 +57,7 @@ var directScheduleCmd = &cobra.Command{
 			return
 		}
 
-		logger.Info(i18n.T("schedule_complete_msg"))
+		logger.Info(i18n.T("direct_schedule_complete_msg"))
 	},
 }
 
@@ -67,7 +67,7 @@ var directScheduleOnceCmd = &cobra.Command{
 	Long:  `Automatically configures Google Takeout to export Photos via Email one time, split into 50GB files.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("========================================")
-		fmt.Println(i18n.T("schedule_title"))
+		fmt.Println(i18n.T("schedule_once_title"))
 		fmt.Println("========================================")
 
 		if config.AppConfig.WorkingPath == "" {
@@ -100,7 +100,7 @@ var directScheduleOnceCmd = &cobra.Command{
 			return
 		}
 
-		logger.Info(i18n.T("schedule_complete_msg"))
+		logger.Info(i18n.T("direct_schedule_once_complete_msg"))
 	},
 }
 

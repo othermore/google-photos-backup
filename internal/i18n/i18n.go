@@ -772,6 +772,10 @@ var messages = map[string]map[string]string{
 		"en": "📅  Configuring Recurring Export",
 		"es": "📅  Configurando Exportación Recurrente",
 	},
+	"schedule_once_title": {
+		"en": "📅  Configuring Single Export",
+		"es": "📅  Configurando Exportación Única",
+	},
 	"schedule_login_info": {
 		"en": "Please run 'gpb configure' to login first, or log in manually in the opened window.",
 		"es": "Por favor ejecuta 'gpb configure' para loguearte primero, o inicia sesión manualmente en la ventana abierta.",
@@ -787,6 +791,18 @@ var messages = map[string]map[string]string{
 	"schedule_complete_msg": {
 		"en": "Google will now export your photos every 2 months to Drive.",
 		"es": "Google ahora exportará tus fotos cada 2 meses a Drive.",
+	},
+	"schedule_once_complete_msg": {
+		"en": "Google will now export your photos once to Drive.",
+		"es": "Google ahora exportará tus fotos una sola vez a Drive.",
+	},
+	"direct_schedule_complete_msg": {
+		"en": "Google will now prepare your photos export every 2 months via direct download.",
+		"es": "Google ahora preparará la exportación de tus fotos cada 2 meses por descarga directa.",
+	},
+	"direct_schedule_once_complete_msg": {
+		"en": "Google will now prepare your photos export once via direct download.",
+		"es": "Google ahora preparará la exportación de tus fotos una sola vez por descarga directa.",
 	},
 	"schedule_next_steps": {
 		"en": "Use 'gpb drive' to process these exports automatically.",
