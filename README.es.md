@@ -107,6 +107,69 @@ La herramienta organiza los archivos en una estructura `Backup/AAAA/MM`.
 *   **Snapshots**: Cada ejecución puede actualizar la estructura existente o crear snapshots (configurable).
 *   **Hardlinks**: Los archivos idénticos entre copias (o importados múltiples veces) se enlazan mediante hardlinks, sin usar espacio adicional.
 
+## Configuración Avanzada (`config.yaml`)
+
+La configuración se almacena en el archivo `config.yaml`. La herramienta lo buscará en las siguientes ubicaciones:
+* **Linux**: `/etc/google-photos-backup/` o `~/.config/google-photos-backup/`
+* **macOS**: `~/.config/google-photos-backup/` o en el directorio actual `./`
+
+### Parámetros de Configuración
+*   `working_path`: Directorio para archivos temporales, procesamiento y datos de sesión del navegador (`browser_data/`).
+*   `backup_path`: Destino final de las fotos organizadas (`Backup/AAAA/MM/...`).
+*   `rclone_remote`: Nombre de tu remoto rclone (ej. `drive:`).
+*   `email_alert_to`: Dirección de correo electrónico para recibir alertas de backups obsoletos (requiere `msmtp`).
+*   `immich_master_enabled`: (`true`/`false`) Activa la integración del repositorio de solo lectura para Immich.
+*   `immich_master_path`: Ruta donde se generará la carpeta `immich-master` (generalmente dentro de `backup_path`).
+*   `fix_ambiguous_metadata`: (`yes`, `no`, `interactive`) Cómo manejar fotos con fechas JSON faltantes/ambiguas.
+*   *Campos Heredados*: `client_id`, `client_secret` y `token_path` están obsoletos, ya que la autenticación ahora usa el navegador web directamente.
+
+### Ejemplo de `config.yaml`
+```yaml
+working_path: "/var/lib/gpb/work"
+backup_path: "/mnt/storage/photos"
+rclone_remote: "gdrive:"
+email_alert_to: "alertas@midominio.com"
+immich_master_enabled: true
+immich_master_path: "/mnt/storage/photos/immich-master"
+fix_ambiguous_metadata: "yes"
+```
+
+### Detalles de Sesión y Autenticación
+La herramienta utiliza un navegador Chrome/Chromium en segundo plazo (headless) para automatizar Google Takeout.
+*   **¿Dónde se guarda?** Todas las cookies de sesión, tokens de confianza para Passkeys y logins se guardan en `[working_path]/browser_data`.
+*   **Mantenlo a salvo**: No borres esta carpeta o necesitarás re-autenticarte manualmente (lo que podría requerir que conectes una Passkey física o un dispositivo 2FA de nuevo).
+
+## Configuración de Herramientas del Sistema
+
+### 1. Rclone (Para el Modo Drive)
+Para usar `gpb drive`, necesitas `rclone` autorizado con tu cuenta de Google.
+*   **macOS / Linux**: Instala con `sudo curl https://rclone.org/install.sh | sudo bash` o `brew install rclone`.
+*   Ejecuta `rclone config`.
+*   Crea un nuevo remoto (`n` de New remote). Llámalo exactamente igual a tu `rclone_remote` de `config.yaml` (por defecto es `drive`).
+*   Selecciona `Google Drive` (`drive`).
+*   Deja en blanco las credenciales de validación (Client credentials) o usa tus propias APIs si requieres límites altos.
+*   Sigue el enlace en el navegador para dar acceso a Rclone a tu cuenta de Drive.
+
+### 2. msmtp (Para Alertas de Correo)
+La herramienta usa el binario `msmtp` nativo del sistema para enviarte correos si los backups tienen más de 2.5 meses (75 días).
+*   **macOS**: `brew install msmtp`
+*   **Linux (Debian/Ubuntu)**: `sudo apt install msmtp msmtp-mta`
+*   Configura el fichero `~/.msmtprc` (o `/etc/msmtprc`) con tu servidor SMTP. Configuración de ejemplo para Gmail:
+    ```ini
+    defaults
+    auth           on
+    tls            on
+    tls_trust_file /etc/ssl/certs/ca-certificates.crt
+    
+    account        default
+    host           smtp.gmail.com
+    port           587
+    user           tu_correo@gmail.com
+    password       tu_contraseña_de_aplicacion
+    from           tu_correo@gmail.com
+    ```
+*   Dale permisos restrictivos: `chmod 600 ~/.msmtprc`
+
 ## Solución de Problemas
 
 *   **Login de Google**: Si la automatización se atasca en el login, ejecuta `gpb tool configure` y elige "Sí" para iniciar sesión interactivamente.

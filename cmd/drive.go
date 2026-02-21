@@ -266,9 +266,9 @@ func checkStaleAndAlert() {
 		return // Never backed up, maybe new install
 	}
 
-	// Check if > 3 months (90 days)
-	// User requested increase to 3 months (approx 90 days)
-	if time.Since(last.CompletedAt) > 90*24*time.Hour {
+	// Check if > 2.5 months (75 days)
+	// Margin of 15 days over the 2-month expected schedule
+	if time.Since(last.CompletedAt) > 75*24*time.Hour {
 		logger.Warn(i18n.T("drive_stale_warn"))
 
 		// Smart Stale Handling: Limit alerts frequency (7 days)

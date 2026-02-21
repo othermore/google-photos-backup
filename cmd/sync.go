@@ -561,9 +561,9 @@ func checkDirectStaleAndAlert() {
 		return // Never backed up, maybe new install
 	}
 
-	// Check if > 2 months (60 days)
-	// User requested "más de 2 meses" for direct
-	if time.Since(last.CompletedAt) > 60*24*time.Hour {
+	// Check if > 2.5 months (75 days)
+	// User requested "más de 2 meses y 15 días" for direct margin
+	if time.Since(last.CompletedAt) > 75*24*time.Hour {
 		logger.Warn(i18n.T("direct_stale_warn"))
 
 		// Smart Stale Handling: Limit alerts frequency (7 days)

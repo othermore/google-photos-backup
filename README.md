@@ -107,6 +107,69 @@ The tool organizes files into a `Backup/YYYY/MM` structure.
 *   **Snapshots**: Each run can update the existing structure or create snapshots (configurable).
 *   **Hardlinks**: Identical files across backups (or imported multiple times) are hardlinked, using no additional space.
 
+## Advanced Configuration (`config.yaml`)
+
+Configuration is stored in `config.yaml`. The tool looks for it in the following locations:
+* **Linux**: `/etc/google-photos-backup/` or `~/.config/google-photos-backup/`
+* **macOS**: `~/.config/google-photos-backup/` or the current directory `./`
+
+### Configuration Parameters
+*   `working_path`: Directory for temporary files, processing, and browser session data (`browser_data/`).
+*   `backup_path`: Final destination for organized photos (`Backup/YYYY/MM/...`).
+*   `rclone_remote`: Name of your rclone remote (e.g., `drive:`).
+*   `email_alert_to`: Email address to receive stale backup alerts (requires `msmtp`).
+*   `immich_master_enabled`: (`true`/`false`) Enables the Immich read-only repository integration.
+*   `immich_master_path`: The path where the `immich-master` folder will be kept (usually inside `backup_path`).
+*   `fix_ambiguous_metadata`: (`yes`, `no`, `interactive`) How to handle photos with missing/ambiguous JSON dates.
+*   *Legacy Fields*: `client_id`, `client_secret`, and `token_path` are deprecated since authentication uses the browser directly.
+
+### Example `config.yaml`
+```yaml
+working_path: "/var/lib/gpb/work"
+backup_path: "/mnt/storage/photos"
+rclone_remote: "gdrive:"
+email_alert_to: "alerts@mydomain.com"
+immich_master_enabled: true
+immich_master_path: "/mnt/storage/photos/immich-master"
+fix_ambiguous_metadata: "yes"
+```
+
+### Authentication Session Details
+The tool uses a headless Chrome/Chromium browser to automate Google Takeout.
+*   **Where is it saved?** All session cookies, Passkey trust tokens, and logins are saved inside `[working_path]/browser_data`.
+*   **Keep it safe**: Do not delete this folder, or you will need to re-authenticate manually (which might require a physical passkey or 2FA device).
+
+## System Tooling Setup
+
+### 1. Rclone (For Drive Mode)
+To use `gpb drive`, you need `rclone` authorized with your Google account.
+*   **macOS / Linux**: Install via `sudo curl https://rclone.org/install.sh | sudo bash` or `brew install rclone`.
+*   Run `rclone config`.
+*   Create a `New remote` (`n`). Name it exactly as your `rclone_remote` in `config.yaml` (default is `drive`).
+*   Select `Google Drive` (`drive`).
+*   Leave Custom client credentials blank (or provide your own API keys for higher limits).
+*   Follow the browser prompt to grant Rclone access to your Drive.
+
+### 2. msmtp (For Email Alerts)
+The tool uses the system's `msmtp` binary to send emails when backups are older than 2.5 months (75 days).
+*   **macOS**: `brew install msmtp`
+*   **Linux (Debian/Ubuntu)**: `sudo apt install msmtp msmtp-mta`
+*   Configure `~/.msmtprc` (or `/etc/msmtprc`) with your SMTP details. Example for Gmail:
+    ```ini
+    defaults
+    auth           on
+    tls            on
+    tls_trust_file /etc/ssl/certs/ca-certificates.crt
+    
+    account        default
+    host           smtp.gmail.com
+    port           587
+    user           youremail@gmail.com
+    password       your_app_password
+    from           youremail@gmail.com
+    ```
+*   Set permissions: `chmod 600 ~/.msmtprc`
+
 ## Troubleshooting
 
 *   **Google Login**: If scheduling hangs at login, run `gpb tool configure` and choose "Yes" to login interactively.

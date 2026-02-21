@@ -1043,8 +1043,8 @@ var messages = map[string]map[string]string{
 		"es": "ℹ️  No se encontraron nuevos archivos en Drive.",
 	},
 	"drive_stale_warn": {
-		"en": "⚠️  Backup is stale (> 3 months). Checking alert policy...",
-		"es": "⚠️  Backup obsoleto (> 3 meses). Comprobando política de alertas...",
+		"en": "⚠️  Backup is stale (> 75 days). Checking alert policy...",
+		"es": "⚠️  Backup obsoleto (> 75 días / 2.5 meses). Comprobando política de alertas...",
 	},
 	"drive_alert_subject": {
 		"en": "[Google Photos Backup] ⚠️ Backup Stale Alert",
@@ -1067,8 +1067,8 @@ var messages = map[string]map[string]string{
 		"es": "ℹ️  Alerta enviada recientemente (%s). Saltando.",
 	},
 	"direct_stale_warn": {
-		"en": "⚠️  Email backup is stale (> 2 months). Checking alert policy...",
-		"es": "⚠️  Backup por Email obsoleto (> 2 meses). Comprobando política de alertas...",
+		"en": "⚠️  Email backup is stale (> 75 days). Checking alert policy...",
+		"es": "⚠️  Backup por Email obsoleto (> 75 días / 2.5 meses). Comprobando política de alertas...",
 	},
 	"direct_alert_subject": {
 		"en": "[Google Photos Backup] ⚠️ Direct Backup Stale Alert",
