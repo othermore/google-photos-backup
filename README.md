@@ -13,8 +13,7 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 
 ## Features
 
-* **Four Modes of Operation:**
-    *   **Direct**: Configure and download archives directly via Email links.
+    *   **Direct**: Configure exports via "Email link", and the tool will download them directly by periodically polling Takeout via the browser.
     *   **Drive**: Configure and automate recurring exports to Google Drive using `rclone`.
     *   **Import**: Manually process existing Takeout ZIPs.
     *   **Tool**: Technical tools for configuration, indexing, and Immich integrations.
@@ -74,19 +73,19 @@ Run this command via **Cron** (e.g., daily). It checks your Drive for new export
 0 3 * * * /path/to/gpb drive download >> /var/log/gpb.log 2>&1
 ```
 
-### 2. Direct Email Backup
-Best if you do not use `rclone`. It configures exports via email and sequentially downloads them.
+### 2. Direct Browser Backup (Takeout "Email link")
+Best if you do not use `rclone`. Although Takeout calls this "Send download link via email", this tool does not actually read your emails. Instead, it periodically checks Google Takeout directly via the browser to see if new exports have been generated, and sequentially downloads them.
 
 **Step A: Schedule Exports**
-* `gpb direct schedule`: Configures recurring exports via Email.
-* `gpb direct schedule-once`: Configures a single, one-time export via Email.
+* `gpb direct schedule`: Configures recurring exports (every 2 months for 1 year).
+* `gpb direct schedule-once`: Configures a single, one-time export.
 
-**Step B: Direct Download**
-Wait until you receive the email from Google, then run:
+**Step B: Unattended Direct Download**
+Run this command via **Cron** (e.g., daily). It will passively check for new exports without any user intervention and process them automatically.
 ```bash
 ./gpb direct download
 ```
-> **Tip**: You can run `gpb direct download` daily via Cron. It will passively check for new exports and process them. If more than 2 months (60 days) pass without a successful backup, it will alert you via email (just like the Drive mode).
+> **Tip**: If more than 2 months (60 days) pass without a successful backup (e.g., the scheduled exports expired), it will attempt to auto-renew or alert you via email to re-authenticate (just like Drive mode).
 
 ### 3. Technical Tools
 The `tool` command regroups all configuration and maintenance tasks:

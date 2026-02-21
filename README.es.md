@@ -14,8 +14,7 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
 
 ## Características
 
-* **Cuatro Modos de Operación:**
-    *   **Direct**: Configura y descarga archivos directamente a través de enlaces de correo electrónico.
+    *   **Direct**: Configura exportaciones mediante "Enlace por correo", y la herramienta las descargará directamente comprobando Takeout periódicamente a través del navegador.
     *   **Drive**: Configura y automatiza exportaciones recurrentes a Google Drive usando `rclone`.
     *   **Import**: Procesa manualmente ZIPs de Takeout existentes.
     *   **Tool**: Herramientas técnicas para configuración, indexación e integraciones con Immich.
@@ -75,19 +74,19 @@ Ejecuta este comando vía **Cron** (ej. diariamente). Revisa tu Drive buscando n
 0 3 * * * /path/to/gpb drive download >> /var/log/gpb.log 2>&1
 ```
 
-### 2. Backup Directo por Email
-Ideal si no usas `rclone`. Configura exportaciones mediante correo electrónico y las descarga secuencialmente.
+### 2. Backup Directo por Navegador (Método "Enlace por correo" de Takeout)
+Ideal si no usas `rclone`. Aunque Takeout llama a esta opción "Enviar enlace de descarga por correo electrónico", esta herramienta no lee tus correos. En su lugar, comprueba periódicamente Google Takeout directamente a través del navegador para ver si se han generado nuevas exportaciones y las descarga de forma secuencial.
 
 **Paso A: Programar Exportaciones**
-* `gpb direct schedule`: Configura exportaciones recurrentes por Email.
-* `gpb direct schedule-once`: Configura una única exportación por Email.
+* `gpb direct schedule`: Configura exportaciones recurrentes (cada 2 meses durante 1 año).
+* `gpb direct schedule-once`: Configura una única exportación.
 
-**Paso B: Descarga Directa**
-Espera hasta recibir el correo electrónico de Google, y luego ejecuta:
+**Paso B: Descarga Directa Desatendida**
+Ejecuta este comando vía **Cron** (ej. diariamente). Revisará de forma pasiva si hay nuevas exportaciones sin intervención del usuario y las procesará automáticamente.
 ```bash
 ./gpb direct download
 ```
-> **Consejo**: Puedes ejecutar `gpb direct download` diariamente vía Cron. Revisará de forma pasiva si hay nuevas exportaciones y las procesará. Si pasan más de 2 meses (60 días) sin un backup exitoso, te alertará por email (igual que el modo Drive).
+> **Consejo**: Si pasan más de 2 meses (60 días) sin un backup exitoso (ej. la programación de exportaciones caducó), intentará auto-renovarse o te alertará por email para re-autenticar (igual que el modo Drive).
 
 ### 3. Herramientas Técnicas
 El comando `tool` agrupa todas las tareas de configuración y mantenimiento:
