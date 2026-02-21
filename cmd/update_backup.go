@@ -528,7 +528,6 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 		inode := stat.Ino
 
 		// 1. Check Internal Hardlink (Intra-Snapshot Deduplication)
-		linkedFromPrev := false
 		if prevPath, ok := inodeMap[inode]; ok {
 			// Found in previous backup or internal map! Link it.
 			if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
@@ -540,7 +539,6 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 				// If it was from previous run, it counts as linked.
 				// If it was internal from same run, it also counts.
 				inodeMap[inode] = destPath // Update map
-				linkedFromPrev = true
 				return nil
 			} else {
 				logger.Info("⚠️ Failed to link from internal/map %s: %v. Will copy/move.", prevPath, err)
@@ -548,7 +546,7 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 		}
 
 		// 2. Check Previous Backup (Inter-Snapshot Deduplication)
-		if !linkedFromPrev && prevDestRoot != "" {
+		if prevDestRoot != "" {
 			prevFile := filepath.Join(prevDestRoot, relPath)
 			if prevInfo, err := os.Stat(prevFile); err == nil {
 				// Candidate exists in previous backup!
@@ -590,7 +588,6 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 						if err := os.Link(prevFile, destPath); err == nil {
 							stats.Linked++
 							inodeMap[inode] = destPath
-							linkedFromPrev = true
 							logger.Info(i18n.T("update_backup_linked_prev"), relPath)
 							return nil
 						}
@@ -600,17 +597,16 @@ func backupExport(srcDir, snapshotRoot, prevBackupRoot string, inodeMap map[uint
 		}
 
 		// 3. Copy/Move (New File)
-		if !linkedFromPrev {
-			if err := moveFile(path, destPath); err != nil {
-				logger.Error("Failed to move/copy %s: %v", relPath, err)
-				return err
-			}
-			stats.Added++
-			stats.Bytes += info.Size()
-			stats.Files = append(stats.Files, relPath)
-			inodeMap[inode] = destPath
-			logger.Info(i18n.T("update_backup_copied"), relPath)
+		if err := moveFile(path, destPath); err != nil {
+			logger.Error("Failed to move/copy %s: %v", relPath, err)
+			return err
 		}
+		stats.Added++
+		stats.Bytes += info.Size()
+		stats.Files = append(stats.Files, relPath)
+		inodeMap[inode] = destPath
+		logger.Info(i18n.T("update_backup_copied"), relPath)
+
 		return nil
 	})
 }

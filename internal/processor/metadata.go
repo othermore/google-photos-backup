@@ -260,17 +260,6 @@ func (m *Manager) findBestJSON(mediaPath string, allJsonFiles map[string]bool, j
 	return "", false, ""
 }
 
-func isMediaExt(ext string) bool {
-	ext = strings.ToLower(ext)
-	switch ext {
-	case ".jpg", ".jpeg", ".png", ".heic", ".webp", ".mp4", ".mov", ".gif", ".avi", ".3gp", ".mkv", ".m4v", ".wmv":
-		return true
-	case ".nef", ".cr2", ".orf", ".arw", ".dng", ".raf", ".rw2", ".srw", ".pef": // RAW formats
-		return true
-	}
-	return false
-}
-
 func (m *Manager) applyDate(mediaPath, jsonPath string) error {
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {

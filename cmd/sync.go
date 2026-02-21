@@ -103,8 +103,6 @@ func (pt *ProgressTracker) Render() {
 	if speedBps > 0 && denominator > totalDownloaded {
 		remainingBytes := denominator - totalDownloaded
 		secondsRemaining := float64(remainingBytes) / speedBps
-		eta := time.Duration(secondsRemaining) * time.Second
-		etaStr = eta.String()
 		// Simple format
 		if secondsRemaining > 3600 {
 			etaStr = fmt.Sprintf("%dh %02dm", int(secondsRemaining/3600), int(secondsRemaining)%3600/60)

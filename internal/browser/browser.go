@@ -1197,23 +1197,6 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 // downloadSingleFile is deprecated/removed in favor of parallel logic inside DownloadFiles
 // We keep handleAuth helper
 
-func (m *Manager) handleAuth(password string) {
-	if password == "" {
-		return
-	}
-	// Check for password input
-	// input[type="password"]
-	// This might happen in the same page (modal) or new page.
-	// Ideally check current page.
-	page := m.Browser.MustPages().First()
-	if el, err := page.Element(`input[type="password"]`); err == nil {
-		fmt.Println(i18n.T("browser_auth_prompt"))
-		el.MustInput(password)
-		time.Sleep(500 * time.Millisecond)
-		// Send Enter key
-		el.MustInput("\n")
-	}
-}
 
 // FormatSize converts bytes to human readable string
 func FormatSize(bytes int64) string {
@@ -1256,4 +1239,3 @@ func ParseSize(s string) int64 {
 	}
 	return int64(val * float64(multiplier))
 }
-

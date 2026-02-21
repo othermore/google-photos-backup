@@ -433,11 +433,6 @@ func hashFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func (e *Engine) unzip(src, dest string) error {
-	_, err := e.unzipAndList(src, dest)
-	return err
-}
-
 func (e *Engine) isSameVolume(path1, path2 string) bool {
 	stat1 := &syscall.Stat_t{}
 	stat2 := &syscall.Stat_t{}
@@ -454,19 +449,4 @@ func (e *Engine) isSameVolume(path1, path2 string) bool {
 	}
 
 	return stat1.Dev == stat2.Dev
-}
-
-// deduplicateAgainstBackup tries to link extracted files to existing backup files
-func (e *Engine) deduplicateAgainstBackup(extractDir string) error {
-	// 1. Scan extractDir
-	// 2. Hash files
-	// 3. Check against Global Index (if exists) or Scan Backup (slow, maybe skip for now)
-
-	// Ideally we load the index.jsonl from BackupDir
-	// index, err := registry.LoadIndex(filepath.Join(e.BackupDir, "index.jsonl"))
-	// ...
-
-	// For this iteration, we keep it empty to ensure compilation and basic flow.
-	// The "Optimization" is a nice-to-have we can add once the main pipeline works.
-	return nil
 }
