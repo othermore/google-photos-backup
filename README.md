@@ -109,9 +109,18 @@ The tool organizes files into a `Backup/YYYY/MM` structure.
 
 ## Advanced Configuration (`config.yaml`)
 
-Configuration is stored in `config.yaml`. The tool looks for it in the following locations:
+Configuration is stored in `config.yaml`. The tool looks for it in the following locations by default:
 * **Linux**: `/etc/google-photos-backup/` or `~/.config/google-photos-backup/`
 * **macOS**: `~/.config/google-photos-backup/` or the current directory `./`
+
+### Managing Multiple Accounts (The `--config` flag)
+You can manage backups for multiple Google accounts by creating separate configuration files for each. Use the global `--config` flag with any command to specify which configuration to use:
+```bash
+# Example: Using a specific config file for a second account
+./gpb --config ~/.config/gpb/account2.yaml drive download
+./gpb --config ~/.config/gpb/account2.yaml tool configure
+```
+This flag is global and works with all commands (`drive`, `direct`, `tool`, `import`).
 
 ### Configuration Parameters
 *   `working_path`: Directory for temporary files, processing, and browser session data (`browser_data/`).

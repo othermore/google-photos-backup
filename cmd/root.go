@@ -10,17 +10,20 @@ import (
 	"github.com/spf13/viper"
 )
 
+var cfgFile string
+
 var rootCmd = &cobra.Command{
 	Use:   "google-photos-backup",
 	Short: "Google Photos Hybrid Backup Tool", // Short description in English generally ok
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		i18n.Init()         // <--- Detectar idioma PRIMERO
-		config.InitConfig() // Luego la config
+		i18n.Init()                // <--- Detectar idioma PRIMERO
+		config.InitConfig(cfgFile) // Luego la config
 	},
 	// ... resto del código ...
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ~/.config/google-photos-backup/config.yaml)")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().Bool("non-interactive", false, "Disable interactive UI (progress bars)")
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))

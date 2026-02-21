@@ -31,19 +31,24 @@ const (
 
 var AppConfig Config
 
-func InitConfig() {
-	// 1. Define config filename
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
+func InitConfig(cfgFile string) {
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// 1. Define config filename default
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
 
-	// 2. Define search paths based on OS
-	if runtime.GOOS == "linux" {
-		viper.AddConfigPath("/etc/google-photos-backup/")
-		viper.AddConfigPath("$HOME/.config/google-photos-backup")
-	} else if runtime.GOOS == "darwin" { // macOS
-		home, _ := os.UserHomeDir()
-		viper.AddConfigPath(filepath.Join(home, ".config", "google-photos-backup"))
-		viper.AddConfigPath(".") // Search in current folder too
+		// 2. Define search paths based on OS
+		if runtime.GOOS == "linux" {
+			viper.AddConfigPath("/etc/google-photos-backup/")
+			viper.AddConfigPath("$HOME/.config/google-photos-backup")
+		} else if runtime.GOOS == "darwin" { // macOS
+			home, _ := os.UserHomeDir()
+			viper.AddConfigPath(filepath.Join(home, ".config", "google-photos-backup"))
+			viper.AddConfigPath(".") // Search in current folder too
+		}
 	}
 
 	// 3. Default values
