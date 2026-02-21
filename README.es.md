@@ -7,9 +7,10 @@
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
-Herramienta CLI para realizar copias de seguridad locales e incrementales de tu librería de Google Photos.
+Herramienta CLI para mantener copias de seguridad locales e incrementales de tu librería de Google Photos y hacerlas accesibles desde **Immich**, con una mínima intervención del usuario.
 
 Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, RedHat, etc.) y macOS.
+> **Nota sobre el uso "Desatendido"**: Debido a las políticas de seguridad de Google (Passkeys y re-autenticación), esta herramienta **no** es totalmente desatendida. Necesitarás interactuar manualmente con la ventana del navegador al menos una vez al año (en el mejor de los casos) cuando caduquen las exportaciones programadas o Google requiera reverificación.
 
 ## Características
 
@@ -21,7 +22,8 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
 *   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
 *   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
 *   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
-*   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (vía sistema `msmtp`).
+*   **Integración con Immich**: Genera un repositorio de solo lectura `immich-master` para que tu backup pueda ser servido directamente por Immich sin duplicar datos.
+*   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (ej. si Google deja de enviar exportaciones o requiere re-autenticación) vía sistema `msmtp`.
 *   **Headless**: Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
 
 ## Instalación
@@ -85,6 +87,7 @@ Espera hasta recibir el correo electrónico de Google, y luego ejecuta:
 ```bash
 ./gpb direct download
 ```
+> **Consejo**: Puedes ejecutar `gpb direct download` diariamente vía Cron. Revisará de forma pasiva si hay nuevas exportaciones y las procesará. Si pasan más de 2 meses (60 días) sin un backup exitoso, te alertará por email (igual que el modo Drive).
 
 ### 3. Herramientas Técnicas
 El comando `tool` agrupa todas las tareas de configuración y mantenimiento:

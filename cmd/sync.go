@@ -6,6 +6,7 @@ import (
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/engine"
 	"google-photos-backup/internal/i18n"
+	"google-photos-backup/internal/notifier"
 	"google-photos-backup/internal/registry"
 	"os"
 	"path/filepath"
@@ -541,48 +542,74 @@ var directDownloadCmd = &cobra.Command{
 			return
 		}
 
-		// 2. Si no hay nada en curso, solicitar nueva
-		logger.Info(i18n.T("resquesting_new_direct"))
+		// 2. Si no hay nada en curso o listo para descargar
+		logger.Info(i18n.T("browser_no_pending"))
+		checkDirectStaleAndAlert()
 
-		if err := bm.RequestTakeout("email", "once"); err != nil {
-			logger.Error(i18n.T("takeout_req_error"), err)
+	},
+}
+
+func checkDirectStaleAndAlert() {
+	regPath := filepath.Join(config.AppConfig.WorkingPath, "history.json")
+	reg, err := registry.New(regPath)
+	if err != nil {
+		return
+	}
+
+	last := reg.GetLastSuccessful()
+	if last == nil {
+		return // Never backed up, maybe new install
+	}
+
+	// Check if > 2 months (60 days)
+	// User requested "más de 2 meses" for direct
+	if time.Since(last.CompletedAt) > 60*24*time.Hour {
+		logger.Warn(i18n.T("direct_stale_warn"))
+
+		// Smart Stale Handling: Limit alerts frequency (7 days)
+		alertStatePath := filepath.Join(config.AppConfig.WorkingPath, "alert_state.txt")
+		lastAlert := time.Time{}
+		if data, err := os.ReadFile(alertStatePath); err == nil {
+			lastAlert, _ = time.Parse(time.RFC3339, string(data))
+		}
+
+		if time.Since(lastAlert) < 7*24*time.Hour {
+			logger.Info(i18n.T("direct_alert_skip"), lastAlert.Format("2006-01-02"))
 			return
 		}
 
-		// Double-check status
-		time.Sleep(5 * time.Second)
-		newStatuses, err := bm.CheckExportStatus()
-		newID := ""
-		if err == nil {
-			for _, st := range newStatuses {
-				if st.InProgress {
-					newID = st.ID
-					break
-				}
+		// Attempt Auto-Renewal (Headless Schedule)
+		logger.Info(i18n.T("direct_auto_renew_head"))
+
+		userDataDir := filepath.Join(config.AppConfig.WorkingPath, "browser_data")
+		// Headless = true
+		bm := browser.New(userDataDir, true)
+		defer bm.Close()
+
+		// Verify Session & Schedule
+		if bm.VerifySession() {
+			if err := bm.RequestTakeout("email", "multiple"); err == nil {
+				logger.Info(i18n.T("direct_auto_renew_success"))
+				// Do not alert if we succeeded renewing
+				return
+			} else {
+				logger.Error(i18n.T("direct_auto_renew_fail"), err)
 			}
 		}
 
-		if newID != "" {
-			logger.Info(i18n.T("sync_new_export"), newID)
-			reg.Add(registry.ExportEntry{
-				ID:          newID,
-				RequestedAt: time.Now(),
-				Status:      registry.StatusInProgress,
-			})
-		} else {
-			logger.Info(i18n.T("sync_pending_export"))
-			reg.Add(registry.ExportEntry{
-				RequestedAt: time.Now(),
-				Status:      registry.StatusRequested,
-			})
+		// If we reached here, headless renew failed, send alert email
+		if config.AppConfig.EmailAlertTo != "" {
+			body_text := fmt.Sprintf(i18n.T("direct_alert_body"), last.CompletedAt.Format("2006-01-02"), time.Since(last.CompletedAt).Round(time.Hour*24).String())
+			err := notifier.SendAlert(
+				i18n.T("direct_alert_subject"),
+				body_text,
+			)
+			if err != nil {
+				logger.Error(i18n.T("direct_alert_fail"), err)
+			} else {
+				logger.Info(i18n.T("direct_alert_sent"))
+				os.WriteFile(alertStatePath, []byte(time.Now().Format(time.RFC3339)), 0644)
+			}
 		}
-
-		if err := reg.Save(); err != nil {
-			logger.Error(i18n.T("history_save_error"), err)
-		} else {
-			logger.Info(i18n.T("history_updated"), regPath)
-		}
-
-		fmt.Println(i18n.T("sync_success"))
-	},
+	}
 }

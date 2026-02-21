@@ -1066,6 +1066,42 @@ var messages = map[string]map[string]string{
 		"en": "ℹ️  Alert already sent recently (%s). Skipping.",
 		"es": "ℹ️  Alerta enviada recientemente (%s). Saltando.",
 	},
+	"direct_stale_warn": {
+		"en": "⚠️  Email backup is stale (> 2 months). Checking alert policy...",
+		"es": "⚠️  Backup por Email obsoleto (> 2 meses). Comprobando política de alertas...",
+	},
+	"direct_alert_subject": {
+		"en": "[Google Photos Backup] ⚠️ Direct Backup Stale Alert",
+		"es": "[Google Photos Backup] ⚠️ Alerta de Backup Directo Obsoleto",
+	},
+	"direct_alert_body": {
+		"en": "Your last successful email backup was on %s (%s ago).\n\nPlease check if your Email export is running correctly.",
+		"es": "Tu último backup exitoso por email fue el %s (hace %s).\n\nPor favor comprueba si tu exportación por email está funcionando correctamente.",
+	},
+	"direct_alert_sent": {
+		"en": "✅ Alert email sent.",
+		"es": "✅ Email de alerta enviado.",
+	},
+	"direct_alert_fail": {
+		"en": "Failed to send alert: %v",
+		"es": "Fallo al enviar alerta: %v",
+	},
+	"direct_alert_skip": {
+		"en": "ℹ️  Alert already sent recently (%s). Skipping.",
+		"es": "ℹ️  Alerta enviada recientemente (%s). Saltando.",
+	},
+	"direct_auto_renew_head": {
+		"en": "🔄 Attempting auto-renewal of Email Takeout schedule (Headless)...",
+		"es": "🔄 Intentando auto-renovación programada de Takeout por Email (Headless)...",
+	},
+	"direct_auto_renew_success": {
+		"en": "✅ Auto-renewal successful! Google should prepare a new export soon.",
+		"es": "✅ ¡Auto-renovación exitosa! Google preparará una nueva exportación pronto.",
+	},
+	"direct_auto_renew_fail": {
+		"en": "Auto-renewal failed: %v",
+		"es": "Auto-renovación fallida: %v",
+	},
 	// --- Import Command ---
 	"import_invalid_dir": {
 		"en": "Invalid import directory: %s",

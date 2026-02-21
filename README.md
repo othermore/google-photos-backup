@@ -6,9 +6,10 @@
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
-CLI tool to perform local, incremental backups of your Google Photos library.
+CLI tool to maintain local, incremental backups of your Google Photos library and make them accessible from **Immich**, with minimal user intervention.
 
 Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) and macOS.
+> **Note on "Unattended" usage**: Due to Google's security policies (Passkeys and re-authentication), this tool is **not** totally unattended. You will need to manually interact with the browser window at least once a year (at best) when the scheduled exports expire or Google requires re-verification.
 
 ## Features
 
@@ -20,7 +21,8 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 *   **Optimized Storage Pipeline**: Downloads, Unzips, Corrections, Deduplication, and Cleanup happen in a streaming pipeline to minimize disk usage.
 *   **Original Quality**: Ensures download of original files with full metadata (JSON dates fixed).
 *   **Smart Deduplication**: Uses hardlinks for cross-snapshot deduplication (Zero Space for duplicates).
-*   **Email Alerts**: Notifies you if backups become stale (via system `msmtp`).
+*   **Immich Integration**: Generates a read-only `immich-master` repository so your backup can be directly served by Immich without duplicating data.
+*   **Email Alerts**: Notifies you if backups become stale (e.g., if Google stops sending exports or requires re-authentication) via system `msmtp`.
 *   **Headless**: Configurable via files, perfect for servers without a GUI.
 
 ## Installation
@@ -84,6 +86,7 @@ Wait until you receive the email from Google, then run:
 ```bash
 ./gpb direct download
 ```
+> **Tip**: You can run `gpb direct download` daily via Cron. It will passively check for new exports and process them. If more than 2 months (60 days) pass without a successful backup, it will alert you via email (just like the Drive mode).
 
 ### 3. Technical Tools
 The `tool` command regroups all configuration and maintenance tasks:
