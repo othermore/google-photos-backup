@@ -85,7 +85,7 @@ Run this command via **Cron** (e.g., daily). It will passively check for new exp
 ```bash
 ./gpb direct download
 ```
-> **Tip**: If more than 2 months (60 days) pass without a successful backup (e.g., the scheduled exports expired), it will attempt to auto-renew or alert you via email to re-authenticate (just like Drive mode).
+> **Tip**: If more than 2.5 months (75 days) pass without a successful backup (e.g., the scheduled exports expired), it will alert you via email every 7 days so you can manually run the schedule command again (just like Drive mode).
 
 ### 3. Technical Tools
 The `tool` command regroups all configuration and maintenance tasks:
@@ -174,7 +174,7 @@ The tool uses the system's `msmtp` binary to send emails when backups are older 
 
 *   **Google Login**: If scheduling hangs at login, run `gpb tool configure` and choose "Yes" to login interactively.
 *   **Rclone**: Ensure `rclone lsd remote:` works before running `gpb drive download`.
-*   **Stale Backups**: If you haven't backed up in >90 days, `gpb drive download` will first try to **auto-renew** the schedule (headless, often works without Passkey). If that fails, it will send an email alert.
+*   **Stale Backups**: If you haven't backed up in >75 days, the download command will send an email alert every 7 days reminding you to manually run the schedule command (which requires a Passkey).
 
 ## Credits
 Developed by http://antonio.mg with the help of gemini

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"google-photos-backup/internal/browser"
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/downloader/rclone"
 	"google-photos-backup/internal/engine"
@@ -283,39 +282,7 @@ func checkStaleAndAlert() {
 			return
 		}
 
-		// Attempt Auto-Renewal (Headless Schedule)
-		logger.Info(i18n.T("drive_auto_renew_head"))
-
-		userDataDir := filepath.Join(config.AppConfig.WorkingPath, "browser_data")
-		// Headless = true
-		bm := browser.New(userDataDir, true)
-		defer bm.Close()
-
-		// Verify Session & Schedule
-		if bm.VerifySession() {
-			if err := bm.RequestTakeout("drive", "multiple"); err == nil {
-				logger.Info(i18n.T("drive_auto_renew_success"))
-				// We treat this as a "partial success" to reset alert timer?
-				// Or update history "RequestedAt"?
-				// Let's just NOT alert.
-				// Update state to prevent immediate retry?
-				// Maybe add a history entry "drive-auto-renew"?
-				reg.Add(registry.ExportEntry{
-					ID:          "drive-auto-renew-" + time.Now().Format("20060102"),
-					Status:      registry.StatusPending, // It's requested
-					RequestedAt: time.Now(),
-					CompletedAt: last.CompletedAt, // Keep last completed same
-				})
-				reg.Save()
-				return
-			} else {
-				logger.Warn(i18n.T("drive_auto_renew_fail"), err)
-			}
-		} else {
-			logger.Warn(i18n.T("drive_auto_renew_skip"))
-		}
-
-		// Fallback: Send Alert Email
+		// Send Alert Email
 		subject := i18n.T("drive_alert_subject")
 		body := fmt.Sprintf(i18n.T("drive_alert_body"),
 			last.CompletedAt.Format("2006-01-02"),

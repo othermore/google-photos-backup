@@ -86,7 +86,7 @@ Ejecuta este comando vía **Cron** (ej. diariamente). Revisará de forma pasiva 
 ```bash
 ./gpb direct download
 ```
-> **Consejo**: Si pasan más de 2 meses (60 días) sin un backup exitoso (ej. la programación de exportaciones caducó), intentará auto-renovarse o te alertará por email para re-autenticar (igual que el modo Drive).
+> **Consejo**: Si pasan más de 2.5 meses (75 días) sin un backup exitoso (ej. la programación de exportaciones caducó), te alertará por email cada 7 días para que puedas volver a ejecutar el comando schedule manualmente (igual que el modo Drive).
 
 ### 3. Herramientas Técnicas
 El comando `tool` agrupa todas las tareas de configuración y mantenimiento:
@@ -174,7 +174,7 @@ La herramienta usa el binario `msmtp` nativo del sistema para enviarte correos s
 
 *   **Login de Google**: Si la automatización se atasca en el login, ejecuta `gpb tool configure` y elige "Sí" para iniciar sesión interactivamente.
 *   **Rclone**: Asegúrate de que `rclone lsd remote:` funciona antes de ejecutar `gpb drive download`.
-*   **Backups Obsoletos**: Si no has hecho copia en >90 días, `gpb drive download` intentará primero **auto-renovar** la programación (headless, a menudo funciona sin Passkey). Si falla, enviará una alerta por email.
+*   **Backups Obsoletos**: Si no has hecho un backup en >75 días, el comando de descarga enviará una alerta por correo cada 7 días recordándote que ejecutes manualmente el comando de programación (el cual requiere una Passkey).
 
 ## Créditos
 

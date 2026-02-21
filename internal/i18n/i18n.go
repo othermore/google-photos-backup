@@ -937,22 +937,6 @@ var messages = map[string]map[string]string{
 		"en": "Failed to load index %s: %v",
 		"es": "Fallo al cargar índice %s: %v",
 	},
-	"drive_auto_renew_head": {
-		"en": "🔄 Attempting auto-renewal of Takeout schedule (Headless)...",
-		"es": "🔄 Intentando auto-renovación programada de Takeout (Headless)...",
-	},
-	"drive_auto_renew_success": {
-		"en": "✅ Auto-renewal successful! Google should prepare a new export soon.",
-		"es": "✅ ¡Auto-renovación exitosa! Google preparará una nueva exportación pronto.",
-	},
-	"drive_auto_renew_fail": {
-		"en": "Auto-renewal failed: %v",
-		"es": "Auto-renovación fallida: %v",
-	},
-	"drive_auto_renew_skip": {
-		"en": "Auto-renewal skipped: Session invalid.",
-		"es": "Auto-renovación saltada: Sesión inválida.",
-	},
 	"browser_selecting_freq": {
 		"en": "⏰ Selecting 'Export every 2 months'...",
 		"es": "⏰ Seleccionando 'Exportar cada 2 meses'...",
@@ -1051,8 +1035,8 @@ var messages = map[string]map[string]string{
 		"es": "[Google Photos Backup] ⚠️ Alerta de Backup Obsoleto",
 	},
 	"drive_alert_body": {
-		"en": "Your last successful backup was on %s (%s ago).\n\nPlease check if your Drive export is running correctly.",
-		"es": "Tu último backup exitoso fue el %s (hace %s).\n\nPor favor comprueba si tu exportación a Drive está funcionando correctamente.",
+		"en": "Your last successful backup was on %s (%s ago).\n\nPlease run 'gpb drive schedule' manually to renew the export or check if your automated export is failing.",
+		"es": "Tu último backup exitoso fue el %s (hace %s).\n\nPor favor, ejecuta 'gpb drive schedule' manualmente para renovar la exportación o comprueba si la automatización está fallando.",
 	},
 	"drive_alert_sent": {
 		"en": "✅ Alert email sent.",
@@ -1075,8 +1059,8 @@ var messages = map[string]map[string]string{
 		"es": "[Google Photos Backup] ⚠️ Alerta de Backup Directo Obsoleto",
 	},
 	"direct_alert_body": {
-		"en": "Your last successful email backup was on %s (%s ago).\n\nPlease check if your Email export is running correctly.",
-		"es": "Tu último backup exitoso por email fue el %s (hace %s).\n\nPor favor comprueba si tu exportación por email está funcionando correctamente.",
+		"en": "Your last successful email backup was on %s (%s ago).\n\nPlease run 'gpb direct schedule' manually to renew the export or check if your automated export is failing.",
+		"es": "Tu último backup exitoso por email fue el %s (hace %s).\n\nPor favor, ejecuta 'gpb direct schedule' manualmente para renovar la exportación o comprueba si la automatización está fallando.",
 	},
 	"direct_alert_sent": {
 		"en": "✅ Alert email sent.",
@@ -1089,18 +1073,6 @@ var messages = map[string]map[string]string{
 	"direct_alert_skip": {
 		"en": "ℹ️  Alert already sent recently (%s). Skipping.",
 		"es": "ℹ️  Alerta enviada recientemente (%s). Saltando.",
-	},
-	"direct_auto_renew_head": {
-		"en": "🔄 Attempting auto-renewal of Email Takeout schedule (Headless)...",
-		"es": "🔄 Intentando auto-renovación programada de Takeout por Email (Headless)...",
-	},
-	"direct_auto_renew_success": {
-		"en": "✅ Auto-renewal successful! Google should prepare a new export soon.",
-		"es": "✅ ¡Auto-renovación exitosa! Google preparará una nueva exportación pronto.",
-	},
-	"direct_auto_renew_fail": {
-		"en": "Auto-renewal failed: %v",
-		"es": "Auto-renovación fallida: %v",
 	},
 	// --- Import Command ---
 	"import_invalid_dir": {

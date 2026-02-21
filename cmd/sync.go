@@ -578,26 +578,7 @@ func checkDirectStaleAndAlert() {
 			return
 		}
 
-		// Attempt Auto-Renewal (Headless Schedule)
-		logger.Info(i18n.T("direct_auto_renew_head"))
-
-		userDataDir := filepath.Join(config.AppConfig.WorkingPath, "browser_data")
-		// Headless = true
-		bm := browser.New(userDataDir, true)
-		defer bm.Close()
-
-		// Verify Session & Schedule
-		if bm.VerifySession() {
-			if err := bm.RequestTakeout("email", "multiple"); err == nil {
-				logger.Info(i18n.T("direct_auto_renew_success"))
-				// Do not alert if we succeeded renewing
-				return
-			} else {
-				logger.Error(i18n.T("direct_auto_renew_fail"), err)
-			}
-		}
-
-		// If we reached here, headless renew failed, send alert email
+		// Send alert email
 		if config.AppConfig.EmailAlertTo != "" {
 			body_text := fmt.Sprintf(i18n.T("direct_alert_body"), last.CompletedAt.Format("2006-01-02"), time.Since(last.CompletedAt).Round(time.Hour*24).String())
 			err := notifier.SendAlert(
