@@ -28,16 +28,20 @@ func prompt(label string, defaultVal string) string {
 	return input
 }
 
-func calculateHash(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
+func calculateHash(filePath string) (hashStr string, err error) {
+	file, openErr := os.Open(filePath)
+	if openErr != nil {
+		return "", openErr
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", err
+	if _, copyErr := io.Copy(hash, file); copyErr != nil {
+		return "", copyErr
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }

@@ -87,7 +87,7 @@ func (m *Manager) Run() error {
 
 func (m *Manager) ScanRaw(dir string, computeHash bool) error {
 	logger.Info("🔍 Scanning existing files in %s...", dir)
-	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) (walkErr error) {
 		if err != nil {
 			return err
 		}
@@ -128,14 +128,18 @@ func (m *Manager) ScanRaw(dir string, computeHash bool) error {
 
 		if hash == "" && computeHash {
 			// Hash file
-			f, err := os.Open(path)
-			if err != nil {
+			f, openErr := os.Open(path)
+			if openErr != nil {
 				return nil
 			}
-			defer f.Close()
+			defer func() {
+				if closeErr := f.Close(); closeErr != nil && walkErr == nil {
+					walkErr = closeErr
+				}
+			}()
 
 			hasher := sha256.New()
-			if _, err := io.Copy(hasher, f); err != nil {
+			if _, copyErr := io.Copy(hasher, f); copyErr != nil {
 				return nil
 			}
 			hash = hex.EncodeToString(hasher.Sum(nil))

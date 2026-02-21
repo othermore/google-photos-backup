@@ -634,30 +634,38 @@ func findLatestBackup(finalPath string) string {
 // isTimestamp is available in package cmd (from fix_hardlinks.go)
 // formatSizeForBackup is available in package cmd (from fix_hardlinks.go)
 
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
+func copyFile(src, dst string) (err error) {
+	sourceFile, openErr := os.Open(src)
+	if openErr != nil {
+		return openErr
 	}
-	defer sourceFile.Close()
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
 	}
 
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
+	destFile, createErr := os.Create(dst)
+	if createErr != nil {
+		return createErr
 	}
-	defer destFile.Close()
+	defer func() {
+		if closeErr := destFile.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
-	if _, err := io.Copy(destFile, sourceFile); err != nil {
-		return err
+	if _, copyErr := io.Copy(destFile, sourceFile); copyErr != nil {
+		return copyErr
 	}
 
-	info, err := sourceFile.Stat()
-	if err == nil {
-		os.Chtimes(dst, time.Now(), info.ModTime())
+	info, statErr := sourceFile.Stat()
+	if statErr == nil {
+		_ = os.Chtimes(dst, time.Now(), info.ModTime())
 	}
 	return nil
 }

@@ -64,18 +64,22 @@ func New(path string) (*Registry, error) {
 	return r, nil
 }
 
-func (r *Registry) Load() error {
+func (r *Registry) Load() (err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	f, err := os.Open(r.FilePath)
-	if os.IsNotExist(err) {
+	f, openErr := os.Open(r.FilePath)
+	if os.IsNotExist(openErr) {
 		return nil
 	}
-	if err != nil {
-		return err
+	if openErr != nil {
+		return openErr
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Leemos línea a línea (JSONL)
 	scanner := bufio.NewScanner(f)
@@ -85,28 +89,32 @@ func (r *Registry) Load() error {
 		if len(line) == 0 {
 			continue
 		}
-		if err := json.Unmarshal(line, &entry); err == nil {
+		if jsonErr := json.Unmarshal(line, &entry); jsonErr == nil {
 			r.Exports = append(r.Exports, entry)
 		}
 	}
 	return scanner.Err()
 }
 
-func (r *Registry) Save() error {
+func (r *Registry) Save() (err error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	f, err := os.Create(r.FilePath)
-	if err != nil {
-		return err
+	f, createErr := os.Create(r.FilePath)
+	if createErr != nil {
+		return createErr
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	enc := json.NewEncoder(f)
 	// Guardamos en formato JSONL (una línea por entrada) para que sea tipo log legible
 	for _, entry := range r.Exports {
-		if err := enc.Encode(entry); err != nil {
-			return err
+		if encErr := enc.Encode(entry); encErr != nil {
+			return encErr
 		}
 	}
 	return nil

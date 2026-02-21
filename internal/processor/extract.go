@@ -230,40 +230,52 @@ func (m *Manager) processExport(id, dir, rawDir string) error {
 	return nil
 }
 
-func (m *Manager) extractZip(src, dest string) error {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
+func (m *Manager) extractZip(src, dest string) (err error) {
+	r, openErr := zip.OpenReader(src)
+	if openErr != nil {
+		return openErr
 	}
-	defer r.Close()
+	defer func() {
+		if closeErr := r.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	for _, f := range r.File {
-		if err := m.extractFile(f.Name, f, dest); err != nil {
+		if errExt := m.extractFile(f.Name, f, dest); errExt != nil {
 			// Log but continue, don't fail the entire archive for one file
-			logger.Error("⚠️  Failed to extract file %s from zip: %v", f.Name, err)
+			logger.Error("⚠️  Failed to extract file %s from zip: %v", f.Name, errExt)
 		}
 	}
 	return nil
 }
 
-func (m *Manager) extractTgz(src, dest string) error {
-	f, err := os.Open(src)
-	if err != nil {
-		return err
+func (m *Manager) extractTgz(src, dest string) (err error) {
+	f, openErr := os.Open(src)
+	if openErr != nil {
+		return openErr
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
-	gzr, err := gzip.NewReader(f)
-	if err != nil {
-		return err
+	gzr, gzErr := gzip.NewReader(f)
+	if gzErr != nil {
+		return gzErr
 	}
-	defer gzr.Close()
+	defer func() {
+		if closeErr := gzr.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	tr := tar.NewReader(gzr)
 
 	for {
-		header, err := tr.Next()
-		if err == io.EOF {
+		header, tarErr := tr.Next()
+		if tarErr == io.EOF {
 			break
 		}
 		if err != nil {
@@ -279,26 +291,30 @@ func (m *Manager) extractTgz(src, dest string) error {
 	return nil
 }
 
-func (m *Manager) extractFile(name string, f *zip.File, dest string) error {
-	rc, err := f.Open()
-	if err != nil {
-		return err
+func (m *Manager) extractFile(name string, f *zip.File, dest string) (err error) {
+	rc, openErr := f.Open()
+	if openErr != nil {
+		return openErr
 	}
-	defer rc.Close()
+	defer func() {
+		if closeErr := rc.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 	return m.extractReader(name, rc, dest, f.FileInfo().Mode())
 }
 
-func (m *Manager) extractReader(name string, r io.Reader, dest string, mode os.FileMode) error {
+func (m *Manager) extractReader(name string, r io.Reader, dest string, mode os.FileMode) (err error) {
 	fpath := filepath.Join(dest, name)
 
 	// ZipSlip check: Ensure fpath is inside dest
-	absDest, err := filepath.Abs(dest)
-	if err != nil {
-		return err
+	absDest, pathErr := filepath.Abs(dest)
+	if pathErr != nil {
+		return pathErr
 	}
-	absFpath, err := filepath.Abs(fpath)
-	if err != nil {
-		return err
+	absFpath, pathErr := filepath.Abs(fpath)
+	if pathErr != nil {
+		return pathErr
 	}
 
 	if !strings.HasPrefix(absFpath, absDest) {
@@ -314,16 +330,20 @@ func (m *Manager) extractReader(name string, r io.Reader, dest string, mode os.F
 	}
 
 	// Create parent dirs
-	if err := os.MkdirAll(filepath.Dir(fpath), 0755); err != nil {
-		return err
+	if mkErr := os.MkdirAll(filepath.Dir(fpath), 0755); mkErr != nil {
+		return mkErr
 	}
 
 	// Create file
-	outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
-	if err != nil {
-		return err
+	outFile, openErr := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if openErr != nil {
+		return openErr
 	}
-	defer outFile.Close()
+	defer func() {
+		if closeErr := outFile.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Multi-writer to calculate Hash on the fly
 	hasher := sha256.New()

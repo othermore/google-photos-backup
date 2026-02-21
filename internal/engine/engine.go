@@ -365,13 +365,16 @@ func (e *Engine) Finalize(snapshotName string) error {
 
 // --- Helpers ---
 
-func (e *Engine) unzipAndList(src, dest string) ([]string, error) {
-	var extracted []string
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return nil, err
+func (e *Engine) unzipAndList(src, dest string) (extracted []string, err error) {
+	r, openErr := zip.OpenReader(src)
+	if openErr != nil {
+		return nil, openErr
 	}
-	defer r.Close()
+	defer func() {
+		if closeErr := r.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	for _, f := range r.File {
 		// Strip leading "Takeout/" if present to flatten the structure
@@ -392,43 +395,53 @@ func (e *Engine) unzipAndList(src, dest string) ([]string, error) {
 		extracted = append(extracted, cleanName)
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(fpath, os.ModePerm)
+			_ = os.MkdirAll(fpath, os.ModePerm)
 			continue
 		}
 
-		if err := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
-			return nil, err
+		if errMk := os.MkdirAll(filepath.Dir(fpath), os.ModePerm); errMk != nil {
+			return nil, errMk
 		}
 
-		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			return nil, err
+		outFile, errCreate := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if errCreate != nil {
+			return nil, errCreate
 		}
 
-		rc, err := f.Open()
-		if err != nil {
-			outFile.Close()
-			return nil, err
+		rc, errOpen := f.Open()
+		if errOpen != nil {
+			_ = outFile.Close()
+			return nil, errOpen
 		}
 
-		_, err = io.Copy(outFile, rc)
+		_, copyErr := io.Copy(outFile, rc)
 
-		outFile.Close()
-		rc.Close()
+		if closeErr := outFile.Close(); closeErr != nil && copyErr == nil {
+			copyErr = closeErr
+		}
+		_ = rc.Close()
+
+		if copyErr != nil {
+			return nil, copyErr
+		}
 	}
 	return extracted, nil
 }
 
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
+func hashFile(path string) (hash string, err error) {
+	f, openErr := os.Open(path)
+	if openErr != nil {
+		return "", openErr
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+	if _, copyErr := io.Copy(h, f); copyErr != nil {
+		return "", copyErr
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }

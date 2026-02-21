@@ -99,18 +99,26 @@ var importCmd = &cobra.Command{
 	},
 }
 
-func copyFileLocal(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
+func copyFileLocal(src, dst string) (err error) {
+	in, openErr := os.Open(src)
+	if openErr != nil {
+		return openErr
 	}
-	defer in.Close()
+	defer func() {
+		if closeErr := in.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
+	out, createErr := os.Create(dst)
+	if createErr != nil {
+		return createErr
 	}
-	defer out.Close()
+	defer func() {
+		if closeErr := out.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	_, err = io.Copy(out, in)
 	return err
