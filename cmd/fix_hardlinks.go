@@ -190,7 +190,7 @@ func formatSizeForBackup(bytes int64) string {
 }
 
 func init() {
-	rootCmd.AddCommand(fixHardlinksCmd)
+	toolCmd.AddCommand(fixHardlinksCmd)
 	fixHardlinksCmd.Flags().Bool("dry-run", false, "Simulate deduplication")
 }
 

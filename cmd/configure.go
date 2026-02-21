@@ -143,3 +143,7 @@ func loginFlow(workingPath string) {
 		logger.Error(i18n.T("session_invalid"))
 	}
 }
+
+func init() {
+	toolCmd.AddCommand(configureCmd)
+}

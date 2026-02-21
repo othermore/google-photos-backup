@@ -256,17 +256,6 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	return nil
 }
 
-// ProcessZip Legacy wrapper
-func (e *Engine) ProcessZip(zipPath string) error {
-	// Works in e.WorkingDir default
-	// We create a temporary batch dir structure to reuse the logic?
-	// Or just keep the old logic for legacy sync?
-	// Let's implement legacy logic for safety or redirect.
-	// Legacy 'ProcessZip' was used by 'gpb sync' which extracts to 'e.WorkingDir/extracted'.
-	// We can use ProcessZipWithIndex passing e.WorkingDir.
-	return e.ProcessZipWithIndex(zipPath, e.WorkingDir)
-}
-
 // Finalize performs the shared processing on all extracted files set
 func (e *Engine) Finalize(snapshotName string) error {
 	logger.Info(i18n.T("engine_final_phase"))

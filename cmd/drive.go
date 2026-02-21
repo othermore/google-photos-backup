@@ -22,6 +22,12 @@ import (
 
 var driveCmd = &cobra.Command{
 	Use:   "drive",
+	Short: "Google Drive Backup management",
+	Long:  `Commands to schedule, download, and manage automated Takeout backups from Google Drive.`,
+}
+
+var driveDownloadCmd = &cobra.Command{
+	Use:   "download",
 	Short: "Automated Drive Backup (Cron mode)",
 	Long:  `Checks Google Drive for new Takeout archives (batches). If found and ready, downloads and processes them. If not found and backup is stale, attempts auto-renewal or sends an alert.`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -287,7 +293,7 @@ func checkStaleAndAlert() {
 
 		// Verify Session & Schedule
 		if bm.VerifySession() {
-			if err := bm.ScheduleRecurringTakeout(); err == nil {
+			if err := bm.RequestTakeout("drive", "multiple"); err == nil {
 				logger.Info(i18n.T("drive_auto_renew_success"))
 				// We treat this as a "partial success" to reset alert timer?
 				// Or update history "RequestedAt"?
@@ -326,4 +332,5 @@ func checkStaleAndAlert() {
 
 func init() {
 	rootCmd.AddCommand(driveCmd)
+	driveCmd.AddCommand(driveDownloadCmd)
 }

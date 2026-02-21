@@ -113,5 +113,5 @@ var rebuildImmichCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(rebuildImmichCmd)
+	toolCmd.AddCommand(rebuildImmichCmd)
 }

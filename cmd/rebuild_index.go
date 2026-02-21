@@ -71,5 +71,5 @@ var rebuildIndexCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(rebuildIndexCmd)
+	toolCmd.AddCommand(rebuildIndexCmd)
 }

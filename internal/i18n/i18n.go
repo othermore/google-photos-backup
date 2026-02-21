@@ -49,14 +49,7 @@ var messages = map[string]map[string]string{
 		"en": "Behavior for ambiguous metadata matches (yes/no/interactive) [default: %s]",
 		"es": "Comportamiento para coincidencias de metadatos ambiguas (yes/no/interactive) [por defecto: %s]",
 	},
-	"prompt_download_mode": {
-		"en": "Select download mode (%s/%s) [default: %s]",
-		"es": "Selecciona el modo de descarga (%s/%s) [por defecto: %s]",
-	},
-	"rclone_notice": {
-		"en": "⚠️  You selected 'driveDownload'. You MUST have rclone installed and configured with a remote pointing to your Google Drive.",
-		"es": "⚠️  Has seleccionado 'driveDownload'. DEBES tener rclone instalado y configurado con un remoto apuntando a tu Google Drive.",
-	},
+
 	"prompt_rclone_remote": {
 		"en": "Enter your rclone remote name [default: %s]",
 		"es": "Introduce el nombre de tu remoto rclone [por defecto: %s]",

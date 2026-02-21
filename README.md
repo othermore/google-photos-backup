@@ -12,10 +12,11 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 
 ## Features
 
-* **Three Modes of Operation:**
-    *   **Sync**: Interactive direct download from Google Takeout.
-    *   **Schedule + Drive**: Configure recurring 2-monthly exports to Drive and automatically download/sync them using `rclone`.
+* **Four Modes of Operation:**
+    *   **Direct**: Configure and download archives directly via Email links.
+    *   **Drive**: Configure and automate recurring exports to Google Drive using `rclone`.
     *   **Import**: Manually process existing Takeout ZIPs.
+    *   **Tool**: Technical tools for configuration, indexing, and Immich integrations.
 *   **Optimized Storage Pipeline**: Downloads, Unzips, Corrections, Deduplication, and Cleanup happen in a streaming pipeline to minimize disk usage.
 *   **Original Quality**: Ensures download of original files with full metadata (JSON dates fixed).
 *   **Smart Deduplication**: Uses hardlinks for cross-snapshot deduplication (Zero Space for duplicates).
@@ -42,7 +43,7 @@ go build -o gpb main.go
 Run the configuration wizard:
 
 ```bash
-./gpb configure
+./gpb tool configure
 ```
 
 This will set up your:
@@ -53,39 +54,46 @@ This will set up your:
 
 ## Usage
 
-### 1. Interactive Sync (Manual Request)
-Best for one-off backups or initial runs. It logs into Google, requests a download, and creates a local backup.
+### 1. Automated Drive Backup (Recommended)
+This method is fully automated and robust. It uses Google Drive to store temporary archives before downloading them using `rclone`, processing them sequentially, and deleting them from the cloud to save space.
 
+**Step A: Schedule Exports**
+Run this to configure Google Takeout to export your photos to Drive.
+* `gpb drive schedule`: Configures recurring exports (every 2 months for 1 year).
+* `gpb drive schedule-once`: Configures a single, one-time export.
+
+**Step B: Unattended Drive Download**
+Run this command via **Cron** (e.g., daily). It checks your Drive for new exports and seamlessly processes them.
 ```bash
-./gpb sync
+./gpb drive download
 ```
-
-### 2. Automated Drive Backup (Recommended)
-This method is fully automated and robust.
-
-**Step A: Schedule Recurring Exports**
-Run this **once** to configure Google Takeout to export your photos to Drive every 2 months for 1 year.
-
-```bash
-./gpb schedule
-```
-
-**Step B: Unattended Drive Sync**
-Run this command via **Cron** (e.g., daily). It checks your Drive for new exports, downloads them, processes them, and deletes them from Drive to save cloud space.
-
-> **Note**: It intelligently groups files by timestamp and **waits for the full export** (detected by the presence of the `...-001.zip` file) before downloading.
-
-```bash
-./gpb drive
-```
-
 **Example Cron:**
 ```bash
-0 3 * * * /path/to/gpb drive >> /var/log/gpb.log 2>&1
+0 3 * * * /path/to/gpb drive download >> /var/log/gpb.log 2>&1
 ```
 
-### 3. Manual Import
-If you have manually downloaded Takeout ZIPs, you can import them:
+### 2. Direct Email Backup
+Best if you do not use `rclone`. It configures exports via email and sequentially downloads them.
+
+**Step A: Schedule Exports**
+* `gpb direct schedule`: Configures recurring exports via Email.
+* `gpb direct schedule-once`: Configures a single, one-time export via Email.
+
+**Step B: Direct Download**
+Wait until you receive the email from Google, then run:
+```bash
+./gpb direct download
+```
+
+### 3. Technical Tools
+The `tool` command regroups all configuration and maintenance tasks:
+* `gpb tool configure`: Interactive configuration wizard.
+* `gpb tool rebuild-index`: Rebuilds local indices.
+* `gpb tool fix-hardlinks`: Validates and repairs cross-volume hardlinks.
+* `gpb tool rebuild-immich-master`: Synchronizes snapshot with an `immich-master` read-only repository.
+
+### 4. Manual Import
+If you have manually downloaded Takeout ZIPs, you can import them directly:
 
 ```bash
 ./gpb import /path/to/folder_with_zips
@@ -99,9 +107,9 @@ The tool organizes files into a `Backup/YYYY/MM` structure.
 
 ## Troubleshooting
 
-*   **Google Login**: If `schedule` or `sync` hangs at login, run `gpb configure` and chose "Yes" to login interactively.
-*   **Rclone**: Ensure `rclone lsd remote:` works before running `gpb drive`.
-*   **Stale Backups**: If you haven't backed up in >90 days, `gpb drive` will first try to **auto-renew** the schedule (headless, often works without Passkey). If that fails, it will send an email alert.
+*   **Google Login**: If scheduling hangs at login, run `gpb tool configure` and choose "Yes" to login interactively.
+*   **Rclone**: Ensure `rclone lsd remote:` works before running `gpb drive download`.
+*   **Stale Backups**: If you haven't backed up in >90 days, `gpb drive download` will first try to **auto-renew** the schedule (headless, often works without Passkey). If that fails, it will send an email alert.
 
 ## Credits
 Developed by http://antonio.mg with the help of gemini

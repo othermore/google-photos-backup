@@ -178,22 +178,23 @@ func (pt *ProgressTracker) Render() {
 }
 
 func init() {
-	syncCmd.Flags().Bool("force", false, "Forzar nueva exportación ignorando la frecuencia configurada")
+	directCmd.AddCommand(directDownloadCmd)
+	directDownloadCmd.Flags().Bool("force", false, "Forzar nueva exportación ignorando la frecuencia configurada")
 }
 
-var syncCmd = &cobra.Command{
-	Use:   "sync",
-	Short: "Request a new Google Photos backup via Takeout",
+var directDownloadCmd = &cobra.Command{
+	Use:   "download",
+	Short: "Request a new Google Photos direct backup via Takeout",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(i18n.T("sync_start"))
 
-		// Asegurarse de que la ruta de backup está configurada
+		// Ensure the backup path is configured
 		if config.AppConfig.WorkingPath == "" {
 			logger.Error(i18n.T("backup_dir_error"))
 			return
 		}
 
-		// Asegurarse de que el directorio de backup existe
+		// Ensure the backup directory exists
 		if err := os.MkdirAll(config.AppConfig.WorkingPath, 0755); err != nil {
 			logger.Error(i18n.T("backup_mkdir_error"), err)
 			return
@@ -201,7 +202,7 @@ var syncCmd = &cobra.Command{
 
 		userDataDir := filepath.Join(config.AppConfig.WorkingPath, "browser_data")
 
-		// Cargar registro de exportaciones (history.json en la carpeta de backup)
+		// Load export history (history.json in the backup folder)
 		regPath := filepath.Join(config.AppConfig.WorkingPath, "history.json")
 		reg, err := registry.New(regPath)
 		if err != nil {
@@ -222,8 +223,8 @@ var syncCmd = &cobra.Command{
 			reg.Save()
 		}
 
-		// Lanzar navegador en modo headless
-		bm := browser.New(userDataDir, false) // Headless false para depurar visualmente
+		// Launch browser in headless mode
+		bm := browser.New(userDataDir, false) // Headless false for visual debugging
 		defer bm.Close()
 
 		// 1. Comprobar estado actual
@@ -233,7 +234,7 @@ var syncCmd = &cobra.Command{
 			return
 		}
 
-		// Actualizar registro local con lo encontrado
+		// Update local registry with what was found
 		var inProgressStatus *browser.ExportStatus
 		var completedStatus *browser.ExportStatus
 
@@ -250,12 +251,12 @@ var syncCmd = &cobra.Command{
 					logger.Info(i18n.T("merging_orphan"), st.ID)
 					entry = reg.Get(st.ID)
 				} else {
-					// Si no hay huérfanas, creamos una nueva (importación pura)
+					// If no orphans, create a new one (pure import)
 					logger.Info(i18n.T("importing_export"), st.ID, st.StatusText)
 					newEntry := registry.ExportEntry{
 						ID:           st.ID,
-						RequestedAt:  st.CreatedAt,              // Puede ser zero si no se parseó
-						Status:       registry.StatusInProgress, // Default, se actualizará abajo
+						RequestedAt:  st.CreatedAt,              // Can be zero if not parsed
+						Status:       registry.StatusInProgress, // Default, will be updated below
 						DownloadMode: st.DownloadMode,           // Saving detected mode
 					}
 					reg.Add(newEntry)
@@ -445,8 +446,8 @@ var syncCmd = &cobra.Command{
 
 			// 4. Start Download with Progress (and Processing)
 
-			// Init Engine
-			eng := engine.New(config.AppConfig.WorkingPath, config.AppConfig.BackupPath)
+			// Init Engine isolated to this download batch
+			eng := engine.New(downloadDir, config.AppConfig.BackupPath)
 
 			// Init Tracker
 			tracker := &ProgressTracker{
@@ -481,7 +482,7 @@ var syncCmd = &cobra.Command{
 					zipPath := filepath.Join(downloadDir, updatedFile.Filename)
 					logger.Info("⚡ Downloaded %s. Processing immediately...", updatedFile.Filename)
 
-					if err := eng.ProcessZip(zipPath); err != nil {
+					if err := eng.ProcessZipWithIndex(zipPath, downloadDir); err != nil {
 						logger.Error("❌ processing failed for %s: %v", updatedFile.Filename, err)
 						// Mark as failed in tracker? Or just log?
 						// Failure in processing shouldn't stop the next download, but is critical.
@@ -521,7 +522,12 @@ var syncCmd = &cobra.Command{
 
 				// FINALIZE Pipeline
 				logger.Info("🔄 Finalizing global processing...")
-				if err := eng.Finalize(""); err != nil {
+				snapshotName := ""
+				if !completedStatus.CreatedAt.IsZero() {
+					snapshotName = completedStatus.CreatedAt.Format("2006-01-02-150405")
+				}
+
+				if err := eng.Finalize(snapshotName); err != nil {
 					logger.Error("❌ Finalization failed: %v", err)
 				} else {
 					logger.Info("✅ All files processed and organized.")
@@ -538,7 +544,7 @@ var syncCmd = &cobra.Command{
 		// 2. Si no hay nada en curso, solicitar nueva
 		logger.Info(i18n.T("resquesting_new_direct"))
 
-		if err := bm.RequestTakeout("directDownload"); err != nil {
+		if err := bm.RequestTakeout("email", "once"); err != nil {
 			logger.Error(i18n.T("takeout_req_error"), err)
 			return
 		}

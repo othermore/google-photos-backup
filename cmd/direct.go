@@ -12,16 +12,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var driveScheduleCmd = &cobra.Command{
+var directCmd = &cobra.Command{
+	Use:   "direct",
+	Short: "Direct Download Backup management",
+	Long:  `Commands to schedule, download, and manage Takeout backups using direct email links.`,
+}
+
+var directScheduleCmd = &cobra.Command{
 	Use:   "schedule",
-	Short: "Configure recurring Takeout export to Google Drive",
-	Long:  `Automatically configures Google Takeout to export Photos to Drive every 2 months for 1 year, split into 50GB files.`,
+	Short: "Configure recurring Takeout export via Email",
+	Long:  `Automatically configures Google Takeout to export Photos via Email every 2 months for 1 year, split into 50GB files.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("========================================")
 		fmt.Println(i18n.T("schedule_title"))
 		fmt.Println("========================================")
 
-		// 1. Verify Config
 		if config.AppConfig.WorkingPath == "" {
 			logger.Error(i18n.T("backup_dir_error"))
 			return
@@ -33,18 +38,13 @@ var driveScheduleCmd = &cobra.Command{
 			return
 		}
 
-		// 2. Launch Browser (Graphical Mode for visibility)
-		// We want the user to see what's happening or intervene if needed (2FA etc)
-		// But ideally it should be automated if session is valid.
 		logger.Info(i18n.T("starting_manager") + " (Gui Mode)")
 		bm := browser.New(userDataDir, false)
 		defer bm.Close()
 
-		// 3. Check Session
 		if !bm.VerifySession() {
 			logger.Error(i18n.T("session_invalid"))
 			logger.Info(i18n.T("schedule_login_info"))
-			// Let user login manually now?
 			bm.ManualLogin()
 			if !bm.VerifySession() {
 				logger.Error(i18n.T("schedule_login_fail"))
@@ -52,25 +52,22 @@ var driveScheduleCmd = &cobra.Command{
 			}
 		}
 
-		// 4. Perform Scheduling
-		if err := bm.RequestTakeout("drive", "multiple"); err != nil {
+		if err := bm.RequestTakeout("email", "multiple"); err != nil {
 			logger.Error(i18n.T("schedule_failed"), err)
 			return
 		}
 
-		// Success message handled in browser.go, just print final user instructions
 		logger.Info(i18n.T("schedule_complete_msg"))
-		logger.Info(i18n.T("schedule_next_steps"))
 	},
 }
 
-var driveScheduleOnceCmd = &cobra.Command{
+var directScheduleOnceCmd = &cobra.Command{
 	Use:   "schedule-once",
-	Short: "Configure a single Takeout export to Google Drive",
-	Long:  `Automatically configures Google Takeout to export Photos to Drive one time, split into 50GB files.`,
+	Short: "Configure a single Takeout export via Email",
+	Long:  `Automatically configures Google Takeout to export Photos via Email one time, split into 50GB files.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("========================================")
-		fmt.Println(i18n.T("schedule_title")) // Can reuse or add specific title
+		fmt.Println(i18n.T("schedule_title"))
 		fmt.Println("========================================")
 
 		if config.AppConfig.WorkingPath == "" {
@@ -98,7 +95,7 @@ var driveScheduleOnceCmd = &cobra.Command{
 			}
 		}
 
-		if err := bm.RequestTakeout("drive", "once"); err != nil {
+		if err := bm.RequestTakeout("email", "once"); err != nil {
 			logger.Error(i18n.T("schedule_failed"), err)
 			return
 		}
@@ -108,6 +105,7 @@ var driveScheduleOnceCmd = &cobra.Command{
 }
 
 func init() {
-	driveCmd.AddCommand(driveScheduleCmd)
-	driveCmd.AddCommand(driveScheduleOnceCmd)
+	rootCmd.AddCommand(directCmd)
+	directCmd.AddCommand(directScheduleCmd)
+	directCmd.AddCommand(directScheduleOnceCmd)
 }

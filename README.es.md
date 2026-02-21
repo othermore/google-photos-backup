@@ -13,10 +13,11 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
 
 ## Características
 
-* **Tres Modos de Operación:**
-    *   **Sync**: Descarga directa interactiva desde Google Takeout.
-    *   **Schedule + Drive**: Configura exportaciones recurrentes (cada 2 meses) a Drive y las descarga/sincroniza automáticamente usando `rclone`.
+* **Cuatro Modos de Operación:**
+    *   **Direct**: Configura y descarga archivos directamente a través de enlaces de correo electrónico.
+    *   **Drive**: Configura y automatiza exportaciones recurrentes a Google Drive usando `rclone`.
     *   **Import**: Procesa manualmente ZIPs de Takeout existentes.
+    *   **Tool**: Herramientas técnicas para configuración, indexación e integraciones con Immich.
 *   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
 *   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
 *   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
@@ -43,7 +44,7 @@ go build -o gpb main.go
 Ejecuta el asistente de configuración:
 
 ```bash
-./gpb configure
+./gpb tool configure
 ```
 
 Esto configurará tu:
@@ -54,40 +55,46 @@ Esto configurará tu:
 
 ## Uso
 
-### 1. Sincronización Interactiva (Sync)
-Ideal para copias puntuales o ejecuciones iniciales. Inicia sesión en Google, solicita una descarga y crea una copia local.
+### 1. Backup Automatizado de Drive (Recomendado)
+Este método es totalmente automatizado y robusto. Utiliza Google Drive para almacenar archivos temporales antes de descargarlos usando `rclone`, procesarlos secuencialmente y borrarlos de la nube para ahorrar espacio.
 
+**Paso A: Programar Exportaciones**
+Ejecuta esto para configurar Google Takeout para exportar tus fotos a Drive.
+* `gpb drive schedule`: Configura exportaciones recurrentes (cada 2 meses durante 1 año).
+* `gpb drive schedule-once`: Configura una única exportación.
+
+**Paso B: Descarga Desatendida de Drive**
+Ejecuta este comando vía **Cron** (ej. diariamente). Revisa tu Drive buscando nuevas exportaciones y las procesa sin intervención.
 ```bash
-./gpb sync
+./gpb drive download
 ```
-
-### 2. Backup Automatizado de Drive (Recomendado)
-Este método es totalmente automatizado y robusto.
-
-**Paso A: Programar Exportaciones Recurrentes**
-Ejecuta esto **una vez** para configurar Google Takeout para exportar tus fotos a Drive cada 2 meses durante 1 año.
-
-```bash
-./gpb schedule
-```
-
-**Paso B: Sincronización Desatendida de Drive**
-Ejecuta este comando vía **Cron** (ej. diariamente). Revisa tu Drive buscando nuevas exportaciones, las descarga, procesa y borra de Drive para ahorrar espacio en la nube.
-
-> **Nota**: Agrupa inteligentemente los archivos por fecha y **espera a que la exportación esté completa** (detectada por la presencia del archivo `...-001.zip`) antes de descargar.
-
-```bash
-./gpb drive
-```
-
 **Ejemplo Cron:**
 ```bash
-0 3 * * * /path/to/gpb drive >> /var/log/gpb.log 2>&1
+0 3 * * * /path/to/gpb drive download >> /var/log/gpb.log 2>&1
 ```
 
-### 3. Importación Manual
-Si has descargado manualmente ZIPs de Takeout, puedes importarlos:
+### 2. Backup Directo por Email
+Ideal si no usas `rclone`. Configura exportaciones mediante correo electrónico y las descarga secuencialmente.
 
+**Paso A: Programar Exportaciones**
+* `gpb direct schedule`: Configura exportaciones recurrentes por Email.
+* `gpb direct schedule-once`: Configura una única exportación por Email.
+
+**Paso B: Descarga Directa**
+Espera hasta recibir el correo electrónico de Google, y luego ejecuta:
+```bash
+./gpb direct download
+```
+
+### 3. Herramientas Técnicas
+El comando `tool` agrupa todas las tareas de configuración y mantenimiento:
+* `gpb tool configure`: Asistente interactivo de configuración.
+* `gpb tool rebuild-index`: Reconstruye los índices locales.
+* `gpb tool fix-hardlinks`: Valida y repara los enlaces duros entre volúmenes.
+* `gpb tool rebuild-immich-master`: Sincroniza un snapshot con un repositorio de solo lectura `immich-master`.
+
+### 4. Importación Manual
+Si has descargado manualmente ZIPs de Takeout, puedes importarlos directamente:
 ```bash
 ./gpb import /ruta/a/carpeta_con_zips
 ```
@@ -100,9 +107,9 @@ La herramienta organiza los archivos en una estructura `Backup/AAAA/MM`.
 
 ## Solución de Problemas
 
-*   **Login de Google**: Si `schedule` o `sync` se atascan en el login, ejecuta `gpb configure` y elige "Sí" para iniciar sesión interactivamente.
-*   **Rclone**: Asegúrate de que `rclone lsd remote:` funciona antes de ejecutar `gpb drive`.
-*   **Backups Obsoletos**: Si no has hecho copia en >90 días, `gpb drive` intentará primero **auto-renovar** la programación (headless, a menudo funciona sin Passkey). Si falla, enviará una alerta por email.
+*   **Login de Google**: Si la automatización se atasca en el login, ejecuta `gpb tool configure` y elige "Sí" para iniciar sesión interactivamente.
+*   **Rclone**: Asegúrate de que `rclone lsd remote:` funciona antes de ejecutar `gpb drive download`.
+*   **Backups Obsoletos**: Si no has hecho copia en >90 días, `gpb drive download` intentará primero **auto-renovar** la programación (headless, a menudo funciona sin Passkey). Si falla, enviará una alerta por email.
 
 ## Créditos
 

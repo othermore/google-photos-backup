@@ -85,7 +85,7 @@ var importCmd = &cobra.Command{
 				continue
 			}
 
-			if err := eng.ProcessZip(tempZip); err != nil {
+			if err := eng.ProcessZipWithIndex(tempZip, filepath.Dir(tempZip)); err != nil {
 				logger.Error(i18n.T("import_process_fail"), err)
 			}
 		}

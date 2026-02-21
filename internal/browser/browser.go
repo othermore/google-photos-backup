@@ -166,8 +166,8 @@ func (m *Manager) VerifySession() bool {
 }
 
 // RequestTakeout navigates to Takeout and requests a new export
-func (m *Manager) RequestTakeout(mode string) error {
-	logger.Info("🚀 Requesting new export (Mode: %s)...", mode)
+func (m *Manager) RequestTakeout(destination string, frequency string) error {
+	logger.Info("🚀 Requesting new export (Destination: %s, Frequency: %s)...", destination, frequency)
 
 	logger.Info(i18n.T("navigating_takeout"))
 	// Force English (hl=en) so aria-label selectors always work
@@ -219,7 +219,7 @@ func (m *Manager) RequestTakeout(mode string) error {
 	time.Sleep(1 * time.Second)
 
 	// --- DESTINATION SELECTION ---
-	if mode == "driveDownload" { // config.ModeDriveDownload string value
+	if destination == "drive" {
 		logger.Info("📂 Selecting 'Add to Drive' as destination...")
 
 		// Wait for the dropdown to be visible. It might load async.
@@ -260,6 +260,25 @@ func (m *Manager) RequestTakeout(mode string) error {
 		time.Sleep(1 * time.Second)
 	}
 
+	// --- FREQUENCY SELECTION ---
+	if frequency == "multiple" {
+		logger.Info(i18n.T("browser_selecting_freq"))
+
+		freqOption, err := page.Element(`input[name="scheduleoptions"][value="2"]`)
+		if err != nil {
+			logger.Warn(i18n.T("browser_freq_fail"))
+			freqLabel, err := page.ElementX(`//div[contains(text(), "Export every 2 months")]`)
+			if err != nil {
+				return fmt.Errorf(i18n.T("browser_freq_error"), err)
+			}
+			freqLabel.MustClick()
+		} else {
+			parent, _ := freqOption.Parent()
+			parent.MustClick()
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	// Select 50GB to reduce file count (fewer ZIPs to return)
 	logger.Debug(i18n.T("config_size"))
 	// Open size menu
@@ -282,20 +301,33 @@ func (m *Manager) RequestTakeout(mode string) error {
 	logger.Debug(i18n.T("waiting_confirmation"))
 	wait()
 
-	// Ensure we are on the Manage page
-	logger.Debug(i18n.T("browser_wait_redirect"))
-	err := page.WaitElementsMoreThan(`div[data-in-progress="true"], button[aria-label="Cancel export"]`, 0)
-	if err != nil {
-		// Fallback: Check URL loop
-		for i := 0; i < 10; i++ {
-			if strings.Contains(page.MustInfo().URL, "manage") {
-				break
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}
-	time.Sleep(2 * time.Second) // Extra buffer for backend propagation
+	// 6. Verification Wait (Passkey / Success)
+	logger.Info(i18n.T("browser_wait_google"))
 
+	// Allow time for navigation or auth prompt to appear/manage page to load
+	time.Sleep(5 * time.Second)
+
+	url := page.MustInfo().URL
+	if strings.Contains(url, "manage") || strings.Contains(url, "takeout/downloads") || strings.Contains(url, "takeout/settings") {
+		logger.Info(i18n.T("browser_redirect_success"))
+	} else {
+		// If not redirected, we are likely in an Auth Challenge or stuck
+		if m.Headless {
+			return fmt.Errorf("headless mode: automated schedule failed (likely auth required)")
+		}
+
+		fmt.Println("\n" + strings.Repeat("=", 60))
+		fmt.Println(i18n.T("browser_auth_required_title"))
+		fmt.Println(strings.Repeat("=", 60))
+		fmt.Println(i18n.T("browser_auth_required_body"))
+		fmt.Println("\n" + i18n.T("browser_press_enter"))
+		fmt.Println(strings.Repeat("=", 60))
+
+		var input string
+		fmt.Scanln(&input)
+	}
+
+	logger.Info("✅ Request process finished.")
 	return nil
 }
 
@@ -1225,142 +1257,3 @@ func ParseSize(s string) int64 {
 	return int64(val * float64(multiplier))
 }
 
-// ScheduleRecurringTakeout configures a recurring export (2 months, 1 year) to Drive
-func (m *Manager) ScheduleRecurringTakeout() error {
-	logger.Info("📅 Configuring recurring export (2 months, Drive)...")
-
-	// 1. Navigation & Product Selection
-	logger.Info(i18n.T("navigating_takeout"))
-	page := m.Browser.MustPage(URLTakeoutSettings)
-	page.MustWaitLoad()
-
-	// Deselect all
-	logger.Debug(i18n.T("deselecting_products"))
-	page.MustElement(`[aria-label="Deselect all"]`).MustClick()
-	time.Sleep(1 * time.Second)
-
-	// Select Photos
-	logger.Info(i18n.T("selecting_photos"))
-	productLabel := page.MustElementX(`//div[normalize-space(text())="Google Photos"]`)
-	found := false
-	parent := productLabel
-	for i := 0; i < 10; i++ {
-		var err error
-		parent, err = parent.Parent()
-		if err != nil {
-			break
-		}
-		if has, _, _ := parent.Has(`input[type="checkbox"]`); has {
-			if _, err := parent.Element(`input[type="checkbox"]:checked`); err == nil {
-				// Already checked
-			} else {
-				parent.MustElement(`input[type="checkbox"]`).MustClick()
-			}
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("could not find Google Photos checkbox")
-	}
-
-	// Next step
-	logger.Debug(i18n.T("next_step"))
-	page.MustElement(`button[aria-label="Next step"]`).MustClick()
-	page.MustWaitLoad()
-	time.Sleep(1 * time.Second)
-
-	// 2. Destination: Add to Drive
-	logger.Info(i18n.T("browser_selecting_drive"))
-	// Open menu
-	destMenu, err := page.Race().Element(`div[role="combobox"][aria-labelledby="destinationSelectID"]`).Element(`div[role="combobox"]`).Handle(func(e *rod.Element) error {
-		return e.WaitVisible()
-	}).Do()
-	if err != nil {
-		return fmt.Errorf(i18n.T("browser_dest_fail"), err)
-	}
-	destMenu.MustClick()
-	time.Sleep(1 * time.Second)
-
-	// Select Option
-	driveOption, err := page.Race().Element(`li[data-value="DRIVE"]`).ElementX(`//span[contains(text(), "Add to Drive")]/ancestor::li`).Handle(func(e *rod.Element) error {
-		return e.WaitVisible()
-	}).Do()
-	if err != nil {
-		return fmt.Errorf(i18n.T("browser_drive_fail"), err)
-	}
-	driveOption.MustClick()
-	time.Sleep(1 * time.Second)
-
-	// 3. Frequency: Export every 2 months for 1 year
-	logger.Info(i18n.T("browser_selecting_freq"))
-
-	// Selector for the radio button value="2"
-	freqOption, err := page.Element(`input[name="scheduleoptions"][value="2"]`)
-	if err != nil {
-		logger.Warn(i18n.T("browser_freq_fail"))
-		freqLabel, err := page.ElementX(`//div[contains(text(), "Export every 2 months")]`)
-		if err != nil {
-			return fmt.Errorf(i18n.T("browser_freq_error"), err)
-		}
-		freqLabel.MustClick()
-	} else {
-		parent, _ := freqOption.Parent()
-		parent.MustClick()
-	}
-	time.Sleep(500 * time.Millisecond)
-
-	// 4. Size: 50 GB
-	logger.Debug(i18n.T("browser_selecting_size"))
-	page.MustElement(`div[aria-label="File size select"]`).MustClick()
-	time.Sleep(500 * time.Millisecond)
-	page.MustElementR("li", "50 GB").MustClick()
-	time.Sleep(500 * time.Millisecond)
-
-	// 5. Create
-	logger.Info(i18n.T("creating_export"))
-
-	// Click create button
-	btn, err := page.ElementR("button", "Create export")
-	if err != nil {
-		// Fallback specific selector
-		btn, err = page.Element(`button[aria-label="Create export"]`)
-		if err != nil {
-			return fmt.Errorf(i18n.T("browser_create_btn_fail"), err)
-		}
-	}
-	btn.MustClick()
-
-	// 6. Verification Wait (Passkey / Success)
-	logger.Info(i18n.T("browser_wait_google"))
-
-	// Allow time for navigation or auth prompt to appear
-	time.Sleep(5 * time.Second)
-
-	// Check if we are already redirected to a success page
-	// Success URLs:
-	// - https://takeout.google.com/takeout/downloads
-	// - https://takeout.google.com/settings/email (sometimes redirects here)
-	url := page.MustInfo().URL
-	if strings.Contains(url, "takeout/downloads") || strings.Contains(url, "takeout/settings") {
-		logger.Info(i18n.T("browser_redirect_success"))
-	} else {
-		// If not redirected, we are likely in an Auth Challenge or stuck
-		if m.Headless {
-			return fmt.Errorf("headless mode: automated schedule failed (likely auth required)")
-		}
-
-		fmt.Println("\n" + strings.Repeat("=", 60))
-		fmt.Println(i18n.T("browser_auth_required_title"))
-		fmt.Println(strings.Repeat("=", 60))
-		fmt.Println(i18n.T("browser_auth_required_body"))
-		fmt.Println("\n" + i18n.T("browser_press_enter"))
-		fmt.Println(strings.Repeat("=", 60))
-
-		var input string
-		fmt.Scanln(&input)
-	}
-
-	logger.Info("✅ Schedule process finished.")
-	return nil
-}
