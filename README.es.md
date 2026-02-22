@@ -142,6 +142,26 @@ Puedes gestionar backups de varias cuentas de Google distintas creando directori
 ```
 Este parámetro es global y funciona con absolutamente todos los comandos (`drive`, `direct`, `tool`, `import`).
 
+### 🖥️ Servidores Remotos (Workaround para Servidores sin Entorno Gráfico)
+Si estás ejecutando `gpb` en un servidor "headless" sin entorno de escritorio (por ejemplo, a través de SSH), cualquier comando que requiera autenticación con Google (como `tool configure` o `drive request`) fallará o se quedará congelado al intentar abrir la ventana de Chromium para hacer login, ya que no tiene donde dibujar la interfaz gráfica (`Could not open the default X display`).
+
+La solución es realizar el inicio de sesión inicial en tu PC personal y transferir la sesión (que es 100% portable):
+
+1. **En tu ordenador local (Mac/Windows/Linux Desktop)**, ejecuta:
+   ```bash
+   ./gpb tool configure --config-dir ./config-servidor
+   ```
+2. El navegador se abrirá en tu PC. Inicia sesión en Google con normalidad y cierra la ventana al terminar.
+3. Ahora tendrás creada una carpeta local llamada `config-servidor` con tu `config.yaml` y la subcarpeta `browser_data/` con la sesión autorizada.
+4. **Transfiere esta carpeta completa de tu PC al servidor** mediante `scp`, `rsync` o FTP:
+   ```bash
+   scp -r ./config-servidor usuario@mi-servidor:~/config-servidor
+   ```
+5. ¡Ya está! Ahora puedes ejecutar todos los comandos remotos y desatendidos directamente en tu servidor apuntando a este directorio. El motor de Chromium arrancará de forma invisible (`headless`) y re-utilizará tu sesión sin pedir login:
+   ```bash
+   ./gpb drive download --config-dir ~/config-servidor
+   ```
+
 ### Registro de Logs Global (El parámetro `--log`)
 Puedes ordenar a la herramienta que escriba trazas de ejecución (en inglés) a un archivo de log estándar de Unix utilizando el parámetro global `--log`.
 Esto es especialmente útil cuando se ejecuta la herramienta automáticamente vía Cron, ya que guarda un registro persistente de los archivos descargados, el progreso de extracción, los enlaces duplicados y cualquier error o resumen final.

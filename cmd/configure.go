@@ -131,6 +131,14 @@ func loginFlow(workingPath string) {
 	fmt.Println(i18n.T("login_start"))
 	fmt.Println(i18n.T("browser_open"))
 
+	fmt.Println("\n=======================================================================================")
+	fmt.Println(" 💡 TIPS FOR REMOTE/HEADLESS SERVERS (SSH):")
+	fmt.Println("  If the browser fails to open or gets stuck because your server has no GUI/Desktop,")
+	fmt.Println("  please run the 'configure' command on your local machine using --config-dir,")
+	fmt.Println("  log in there, and then copy the entire resulting folder to your server via SCP.")
+	fmt.Println("  -> Check the README 'Headless / Remote Servers' section for a step-by-step guide.")
+	fmt.Println("=======================================================================================\n")
+
 	// Usamos el directorio de backup para guardar la sesión del navegador (carpeta 'browser_data')
 	userDataDir := filepath.Join(workingPath, "browser_data")
 

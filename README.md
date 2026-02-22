@@ -145,6 +145,26 @@ You can manage backups for multiple Google accounts by creating separate configu
 ```
 This flag is global and works with all commands (`drive`, `direct`, `tool`, `import`).
 
+### 🖥️ Headless / Remote Servers (GUI Workaround)
+If you are running `gpb` on a headless server without a desktop environment (via SSH), any command that requires Google authentication (like `tool configure` or `drive request`) will fail or freeze when attempting to launch the Chromium login window, since it cannot render the graphical interface (`Could not open the default X display`).
+
+The solution is to perform the initial login on your personal computer and transfer the portable session:
+
+1. **On your local computer (Mac/Windows/Linux Desktop)**, run:
+   ```bash
+   ./gpb tool configure --config-dir ./my-server-config
+   ```
+2. The browser will open. Log into your Google Account normally and close the browser.
+3. You will now have a local folder called `my-server-config` containing your `config.yaml` and a `browser_data/` folder holding your authenticated session.
+4. **Transfer this entire folder to your server** via `scp`, `rsync`, or FTP:
+   ```bash
+   scp -r ./my-server-config user@my-server:~/my-server-config
+   ```
+5. You can now run all automated commands directly on your server by pointing to the transferred directory. The Chrome browser on the server will run in standard headless mode and flawlessly re-use your imported session:
+   ```bash
+   ./gpb drive download --config-dir ~/my-server-config
+   ```
+
 ### Global File Logging (The `--log` flag)
 You can instruct the tool to write execution traces (in English) to a standard Unix log file by using the global `--log` flag.
 This is particularly useful when running the tool automatically via Cron, as it keeps a persistent record of downloaded files, extraction progress, deduplicated links, and any errors/summaries.
