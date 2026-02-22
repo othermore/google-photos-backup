@@ -57,7 +57,7 @@ func New(userDataDir string, headless bool) *Manager {
 
 	// If not headless (login mode), ensure window is visible
 	if !headless {
-		l = l.Set("start-maximized")
+		l = l.Set("start-maximized").Set("window-size", "1280,800")
 	}
 
 	// Launch browser
@@ -73,6 +73,11 @@ func New(userDataDir string, headless bool) *Manager {
 			Set("disable-blink-features", "AutomationControlled").
 			Set("exclude-switches", "enable-automation").
 			Set("use-automation-extension", "false")
+
+		if !headless {
+			l = l.Set("start-maximized").Set("window-size", "1280,800")
+		}
+
 		url = l.MustLaunch()
 	}
 
