@@ -43,6 +43,7 @@ func New(userDataDir string, headless bool) *Manager {
 	l := launcher.New().
 		UserDataDir(userDataDir). // Session persistence
 		Headless(headless).
+		NoSandbox(true).
 		Set("lang", "en-US"). // Force English locale
 		Devtools(false).
 		Set("disable-blink-features", "AutomationControlled"). // Hide bot status
@@ -68,6 +69,7 @@ func New(userDataDir string, headless bool) *Manager {
 		l = launcher.New().
 			UserDataDir(userDataDir).
 			Headless(headless).
+			NoSandbox(true).
 			Set("disable-blink-features", "AutomationControlled").
 			Set("exclude-switches", "enable-automation").
 			Set("use-automation-extension", "false")
@@ -1196,7 +1198,6 @@ func (m *Manager) DownloadFiles(id string, files []registry.DownloadFile, destDi
 
 // downloadSingleFile is deprecated/removed in favor of parallel logic inside DownloadFiles
 // We keep handleAuth helper
-
 
 // FormatSize converts bytes to human readable string
 func FormatSize(bytes int64) string {

@@ -13,7 +13,6 @@ import (
 type Config struct {
 	UserID               string `mapstructure:"user_id"`
 	WorkingPath          string `mapstructure:"working_path"`
-	IndexPath            string `mapstructure:"index_path"`
 	ClientID             string `mapstructure:"client_id"`
 	ClientSecret         string `mapstructure:"client_secret"`
 	TokenPath            string `mapstructure:"token_path"`
@@ -62,7 +61,6 @@ func InitConfig(cfgDir string) {
 
 	// 3. Default values
 	viper.SetDefault("working_path", "./work")
-	viper.SetDefault("index_path", "./index.jsonl")
 	viper.SetDefault("fix_ambiguous_metadata", "interactive")
 	viper.SetDefault("backup_path", "") // Empty by default
 	viper.SetDefault("immich_master_enabled", false)
