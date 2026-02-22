@@ -18,27 +18,40 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
     *   **Drive**: Configura y automatiza exportaciones recurrentes a Google Drive usando `rclone`.
     *   **Import**: Procesa manualmente ZIPs de Takeout existentes.
     *   **Tool**: Herramientas técnicas para configuración, indexación e integraciones con Immich.
-*   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
-*   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
-*   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
-*   **Integración con Immich**: Genera un repositorio de solo lectura `immich-master` para que tu backup pueda ser servido directamente por Immich sin duplicar datos.
-*   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (ej. si Google deja de enviar exportaciones o requiere re-autenticación) vía sistema `msmtp`.
-*   **Headless**: Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
+    *   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
+    *   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
+    *   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
+    *   **Integración con Immich**: Genera un repositorio de solo lectura `immich-master` para que tu backup pueda ser servido directamente por Immich sin duplicar datos.
+    *   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (ej. si Google deja de enviar exportaciones o requiere re-autenticación) vía sistema `msmtp`.
+    *   **Headless**: Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
 
-## Instalación
+## 🚀 Instalación y Compilación
 
-### Desde el código fuente (Requiere Go 1.20+)
+Puedes instalar la herramienta descargando un binario precompilado o compilándola tú mismo desde el código fuente.
+
+### Método 1: Descargar una Release (Recomendado)
+Puedes descargar la última versión compilada para Linux (amd64, arm64) y macOS (Intel, Apple Silicon) directamente desde la **[página de Releases](https://github.com/toniomg/google-photos-backup/releases)**.
+
+1. Descarga el archivo `.tar.gz` correspondiente a tu sistema operativo.
+2. Descomprímelo y coloca el archivo `gpb` en una ruta dentro de tu PATH (por ejemplo, `/usr/local/bin`).
+3. Dale permisos de ejecución: `chmod +x /usr/local/bin/gpb`
+
+### Método 2: Compilar desde el Código Fuente (Requiere Go 1.21+)
+
+Alternativamente, puedes clonar el repositorio y compilar la herramienta:
 
 ```bash
-git clone https://github.com/your-username/google-photos-backup.git
+git clone https://github.com/toniomg/google-photos-backup.git
 cd google-photos-backup
 go build -o gpb main.go
+chmod +x gpb
 ```
 
-### Requisitos
-*   **Google Chrome / Chromium**: Para la automatización del navegador (programación/solicitud).
-*   **Rclone**: Requerido para el modo `drive` (descarga desde Google Drive).
-*   **msmtp** (Opcional): Para alertas por correo electrónico.
+## Uso Básico
+
+1. Crea un fichero `config.yaml` usando el ejemplo que verás más abajo.
+2. Asegúrate de tener Chrome o Chromium instalado.
+3. Si usas el modo `gpb drive`, autoriza `rclone` y haz una prueba con `rclone ls <tu_remoto>:Takeout`
 
 ## Configuración
 
@@ -53,6 +66,10 @@ Esto configurará tu:
 *   Directorio de Backup (almacenamiento final)
 *   Remoto de Rclone (para modo Drive)
 *   Email para alertas
+
+## Herramienta de Backup Híbrido para Google Photos (gpb) v0.9.0
+
+Una herramienta por línea de comandos escrita en Go que automatiza las copias de seguridad de Google Photos mediante Takeout. Descarga y extrae archivos de forma incremental en una estructura de carpetas por año/mes (`Backup/AAAA/MM`), mientras elimina automáticamente el **100% de los duplicados**, tanto dentro del lote actual como en todo el archivo histórico, utilizando "hardlinks" que ocupan un tamaño de cero bytes.
 
 ## Uso
 

@@ -24,17 +24,35 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 *   **Email Alerts**: Notifies you if backups become stale (e.g., if Google stops sending exports or requires re-authentication) via system `msmtp`.
 *   **Headless**: Configurable via files, perfect for servers without a GUI.
 
-## Installation
+## 🚀 Installation & Build
 
-### From Source (Requires Go 1.20+)
+You can install the tool by downloading a pre-compiled binary or building it yourself.
+
+### Method 1: Download from Releases (Recommended)
+You can download the latest pre-compiled binaries for Linux (amd64, arm64) and macOS (Intel, Apple Silicon) directly from the **[Releases page](https://github.com/toniomg/google-photos-backup/releases)**.
+
+1. Download the `.tar.gz` for your operating system.
+2. Extract it and place the `gpb` binary in a directory in your PATH (e.g., `/usr/local/bin`).
+3. Make it executable: `chmod +x /usr/local/bin/gpb`
+
+### Method 2: Compile from Source (Requires Go 1.21+)
+
+Alternatively, you can clone the repository and build the binary yourself.
 
 ```bash
-git clone https://github.com/your-username/google-photos-backup.git
+git clone https://github.com/toniomg/google-photos-backup.git
 cd google-photos-backup
 go build -o gpb main.go
+chmod +x gpb
 ```
 
-### Prerequisites
+## Basic Usage
+
+1. Create a `config.yaml` using the example provided below.
+2. Ensure you have installed chromium or google chrome locally.
+3. If using `gpb drive`, authorize `rclone` and test with `rclone ls <your_remote>:Takeout`
+
+## Prerequisites
 *   **Google Chrome / Chromium**: For browser automation (scheduling/requesting).
 *   **Rclone**: Required for `drive` mode (downloading from Google Drive).
 *   **msmtp** (Optional): For email alerts.
