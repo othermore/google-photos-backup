@@ -46,6 +46,9 @@ func New(userDataDir string, headless bool) *Manager {
 		NoSandbox(true).
 		Set("lang", "en-US"). // Force English locale
 		Devtools(false).
+		Set("disable-gpu").
+		Set("disable-dev-shm-usage").
+		Set("password-store", "basic").
 		Set("disable-blink-features", "AutomationControlled"). // Hide bot status
 		Set("exclude-switches", "enable-automation").          // Avoids "Chrome is being controlled..." bar
 		Set("use-automation-extension", "false")               // Disable automation extension
@@ -70,6 +73,9 @@ func New(userDataDir string, headless bool) *Manager {
 			UserDataDir(userDataDir).
 			Headless(headless).
 			NoSandbox(true).
+			Set("disable-gpu").
+			Set("disable-dev-shm-usage").
+			Set("password-store", "basic").
 			Set("disable-blink-features", "AutomationControlled").
 			Set("exclude-switches", "enable-automation").
 			Set("use-automation-extension", "false")
