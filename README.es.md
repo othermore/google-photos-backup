@@ -1,8 +1,8 @@
 > [!IMPORTANT]
-> Este proyecto está todavía en desarrollo. No lo uses, o hazlo bajo tu cuenta y riesgo. Espero tener un release inicial a finales de Marzo de 2026.
-
-
-# Google Photos Backup (Linux/macOS)
+> **Pre-release v0.9.0**: La herramienta es estable y está muy cerca de la versión final 1.0.0, pero por favor, úsala bajo tu propia responsabilidad.
+> 
+> **👋 ¿Estás usando `gpb` o te ha parecido interesante?**
+> ¡Nos encantaría saber de ti! Por favor, considera [dejarnos un mensaje en los Issues](https://github.com/othermore/google-photos-backup/issues) para decírnoslo o compartir tu opinión. ¡Tu apoyo es lo que nos motiva a seguir! Echa un vistazo a [CONTRIBUTING.md](CONTRIBUTING.md) para ver cómo puedes ayudar u opinar (en inglés).
 
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
