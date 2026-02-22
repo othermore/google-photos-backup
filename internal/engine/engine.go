@@ -93,11 +93,12 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	}
 
 	logger.Info(i18n.T("engine_extracting"))
-	// We need to know WHICH files were extracted to dedup them specifically
 	extractedFiles, err := e.unzipAndList(zipPath, extractDir)
 	if err != nil {
+		logger.LogToFile("ERROR: Extraction failed for %s: %v", filepath.Base(zipPath), err)
 		return fmt.Errorf(i18n.T("engine_extract_fail"), err)
 	}
+	logger.LogToFile("EXTRACT: Unzipped %d files from %s", len(extractedFiles), filepath.Base(zipPath))
 
 	// 2. Incremental Deduplication (Local Batch Index)
 	indexFile := filepath.Join(batchDir, "index.json")
@@ -241,6 +242,7 @@ func (e *Engine) ProcessZipWithIndex(zipPath, batchDir string) error {
 	}
 	logger.Info(i18n.T("engine_dedup_stats"), filesDedupedGlobal, filesDedupedLocal)
 	logger.Info(i18n.T("engine_index_updated"), len(batchIndex.Files))
+	logger.LogToFile("DEDUP: Archive %s deduplicated. Global hardlinks: %d. Local hardlinks: %d", filepath.Base(zipPath), filesDedupedGlobal, filesDedupedLocal)
 
 	// Save Index (Standard Format)
 	if err := batchIndex.Save(indexFile); err != nil {

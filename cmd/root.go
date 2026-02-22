@@ -26,8 +26,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ~/.config/google-photos-backup/config.yaml)")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().Bool("non-interactive", false, "Disable interactive UI (progress bars)")
-	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
-	viper.BindPFlag("non_interactive", rootCmd.PersistentFlags().Lookup("non-interactive"))
+	rootCmd.PersistentFlags().String("log", "", "Path to global log file")
+	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	_ = viper.BindPFlag("non_interactive", rootCmd.PersistentFlags().Lookup("non-interactive"))
+	_ = viper.BindPFlag("log", rootCmd.PersistentFlags().Lookup("log"))
 }
 
 func Execute() {

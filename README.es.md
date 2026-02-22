@@ -122,6 +122,15 @@ Puedes gestionar backups de varias cuentas de Google distintas creando archivos 
 ```
 Este parámetro es global y funciona con absolutamente todos los comandos (`drive`, `direct`, `tool`, `import`).
 
+### Registro de Logs Global (El parámetro `--log`)
+Puedes ordenar a la herramienta que escriba trazas de ejecución (en inglés) a un archivo de log estándar de Unix utilizando el parámetro global `--log`.
+Esto es especialmente útil cuando se ejecuta la herramienta automáticamente vía Cron, ya que guarda un registro persistente de los archivos descargados, el progreso de extracción, los enlaces duplicados y cualquier error o resumen final.
+```bash
+# Ejemplo: Escribiendo logs de ejecución a un archivo
+./gpb --log /var/log/gpb.log drive download
+```
+Este parámetro está soportado por los comandos `drive download`, `direct download` e `import`.
+
 ### Parámetros de Configuración
 *   `working_path`: Directorio para archivos temporales, procesamiento y datos de sesión del navegador (`browser_data/`).
 *   `backup_path`: Destino final de las fotos organizadas (`Backup/AAAA/MM/...`).

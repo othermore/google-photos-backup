@@ -185,6 +185,13 @@ var directDownloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Request a new Google Photos direct backup via Takeout",
 	Run: func(cmd *cobra.Command, args []string) {
+		if logPath := viper.GetString("log"); logPath != "" {
+			if err := logger.InitLogFile(logPath); err == nil {
+				defer logger.CloseLogFile()
+				logger.LogToFile("==================================================")
+				logger.LogToFile("START: Command 'direct download' initiated")
+			}
+		}
 		fmt.Println(i18n.T("sync_start"))
 
 		// Ensure the backup path is configured
@@ -474,18 +481,24 @@ var directDownloadCmd = &cobra.Command{
 					}
 					// Completed logging handled below after processing
 				}
+				if oldStatus != "downloading" && newStatus == "downloading" {
+					logger.LogToFile("DOWNLOAD: Started downloading %s", updatedFile.Filename)
+				}
 
 				// If Completed, Trigger Processing
 				if oldStatus != "completed" && newStatus == "completed" {
 					// Download finished! Process Immediately!
 					zipPath := filepath.Join(downloadDir, updatedFile.Filename)
+					logger.LogToFile("DOWNLOAD: Successfully downloaded %s", updatedFile.Filename)
 					logger.Info("⚡ Downloaded %s. Processing immediately...", updatedFile.Filename)
 
 					if err := eng.ProcessZipWithIndex(zipPath, downloadDir); err != nil {
 						logger.Error("❌ processing failed for %s: %v", updatedFile.Filename, err)
+						logger.LogToFile("ERROR: Failed processing %s: %v", updatedFile.Filename, err)
 						// Mark as failed in tracker? Or just log?
 						// Failure in processing shouldn't stop the next download, but is critical.
 					} else {
+						logger.LogToFile("SUCCESS: Processed %s locally", updatedFile.Filename)
 						logger.Info("✅ Processed %s (Space freed).", updatedFile.Filename)
 					}
 				}
@@ -512,10 +525,12 @@ var directDownloadCmd = &cobra.Command{
 			if err != nil {
 				if err == browser.ErrQuotaExceeded {
 					fmt.Println(i18n.T("sync_quota_exceeded"))
+					logger.LogToFile("WARNING: Quota exceeded during download")
 					// ... (cleanup logic) ...
 					return
 				}
 				logger.Error(i18n.T("download_finished_error"), err)
+				logger.LogToFile("SUMMARY: Completed with errors: %v", err)
 			} else {
 				logger.Info(i18n.T("download_completed"), downloadDir)
 
@@ -528,8 +543,10 @@ var directDownloadCmd = &cobra.Command{
 
 				if err := eng.Finalize(snapshotName); err != nil {
 					logger.Error("❌ Finalization failed: %v", err)
+					logger.LogToFile("ERROR: Finalization failed: %v", err)
 				} else {
 					logger.Info("✅ All files processed and organized.")
+					logger.LogToFile("SUMMARY: Direct download & processing finished successfully")
 					// Cleanup Download Dir (should be empty of zips, but might have state.json)
 					os.RemoveAll(downloadDir)
 				}
@@ -587,6 +604,7 @@ func checkDirectStaleAndAlert() {
 				logger.Error(i18n.T("direct_alert_fail"), err)
 			} else {
 				logger.Info(i18n.T("direct_alert_sent"))
+				logger.LogToFile("ALERT: Freshness alert email sent to %s", config.AppConfig.EmailAlertTo)
 				os.WriteFile(alertStatePath, []byte(time.Now().Format(time.RFC3339)), 0644)
 			}
 		}

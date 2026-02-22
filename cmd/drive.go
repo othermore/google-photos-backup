@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var driveCmd = &cobra.Command{
@@ -30,6 +31,13 @@ var driveDownloadCmd = &cobra.Command{
 	Short: "Automated Drive Backup (Cron mode)",
 	Long:  `Checks Google Drive for new Takeout archives (batches). If found and ready, downloads and processes them. If not found and backup is stale, attempts auto-renewal or sends an alert.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if logPath := viper.GetString("log"); logPath != "" {
+			if err := logger.InitLogFile(logPath); err == nil {
+				defer logger.CloseLogFile()
+				logger.LogToFile("==================================================")
+				logger.LogToFile("START: Command 'drive download' initiated")
+			}
+		}
 		logger.Info(i18n.T("drive_robot_start"))
 
 		// 1. Config Check
@@ -159,9 +167,11 @@ var driveDownloadCmd = &cobra.Command{
 					// Verify rc.MoveFile logic in rclone.go: it moves file to localDir.
 					if err := rc.MoveFile(file.Name, batchWorkDir); err != nil {
 						logger.Error(i18n.T("drive_dl_move_fail"), file.Name, err)
+						logger.LogToFile("ERROR: Failed to download %s: %v", file.Name, err)
 						failed = true
 						continue // Skip processing this file
 					}
+					logger.LogToFile("DOWNLOAD: Successfully downloaded %s", file.Name)
 
 					// Process immediately
 					localPath := filepath.Join(batchWorkDir, file.Name)
@@ -204,8 +214,10 @@ var driveDownloadCmd = &cobra.Command{
 				// 4. Finalize Batch
 				if err := batchEng.Finalize(formattedTs); err != nil {
 					logger.Error(i18n.T("drive_final_fail"), err)
+					logger.LogToFile("ERROR: Batch %s failed finalize: %v", ts, err)
 				} else {
 					logger.Info(i18n.T("drive_processed_success"))
+					logger.LogToFile("SUCCESS: Batch %s finalized and processed", ts)
 					updateHistorySuccess()
 
 					// Cleanup Batch Dir (Index, empty extracted)
@@ -233,7 +245,10 @@ var driveDownloadCmd = &cobra.Command{
 			} else {
 				logger.Info(i18n.T("drive_no_ready_batches"))
 			}
+			logger.LogToFile("SUMMARY: Run completed. Downloaded & Processed: 0 batches")
 			checkStaleAndAlert()
+		} else {
+			logger.LogToFile("SUMMARY: Run completed. Downloaded & Processed: %d batches", processedBatches)
 		}
 	},
 }
@@ -290,6 +305,7 @@ func checkStaleAndAlert() {
 
 		if err := notifier.SendAlert(subject, body); err == nil {
 			logger.Info(i18n.T("drive_alert_sent"))
+			logger.LogToFile("ALERT: Freshness alert email sent to %s", config.AppConfig.EmailAlertTo)
 			os.WriteFile(alertStatePath, []byte(time.Now().Format(time.RFC3339)), 0644)
 		} else {
 			logger.Error(i18n.T("drive_alert_fail"), err)

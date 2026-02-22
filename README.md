@@ -122,6 +122,15 @@ You can manage backups for multiple Google accounts by creating separate configu
 ```
 This flag is global and works with all commands (`drive`, `direct`, `tool`, `import`).
 
+### Global File Logging (The `--log` flag)
+You can instruct the tool to write execution traces (in English) to a standard Unix log file by using the global `--log` flag.
+This is particularly useful when running the tool automatically via Cron, as it keeps a persistent record of downloaded files, extraction progress, deduplicated links, and any errors/summaries.
+```bash
+# Example: Writing execution logs to a file
+./gpb --log /var/log/gpb.log drive download
+```
+This flag is supported by the `drive download`, `direct download`, and `import` commands.
+
 ### Configuration Parameters
 *   `working_path`: Directory for temporary files, processing, and browser session data (`browser_data/`).
 *   `backup_path`: Final destination for organized photos (`Backup/YYYY/MM/...`).
