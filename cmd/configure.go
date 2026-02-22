@@ -91,13 +91,18 @@ var configureCmd = &cobra.Command{
 		viper.Set("backup_path", absBackupPath)
 
 		// Ensure the directory for the config exists
-		configDir := filepath.Dir(viper.ConfigFileUsed())
-		if configDir == "" || configDir == "." {
-			// If not set, ConfigLoader will default but during configure we enforce creation
-			home, _ := os.UserHomeDir()
-			configDir = filepath.Join(home, ".config", "google-photos-backup")
-			viper.SetConfigFile(filepath.Join(configDir, "config.yaml"))
+		var configDir string
+		if cfgFile != "" {
+			configDir = cfgFile
+		} else {
+			configDir = filepath.Dir(viper.ConfigFileUsed())
+			if configDir == "" || configDir == "." {
+				home, _ := os.UserHomeDir()
+				configDir = filepath.Join(home, ".config", "google-photos-backup")
+			}
 		}
+
+		viper.SetConfigFile(filepath.Join(configDir, "config.yaml"))
 
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			fmt.Printf(i18n.T("error_mkdir")+"\n", err)
