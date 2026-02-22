@@ -31,16 +31,18 @@ const (
 
 var AppConfig Config
 
-func InitConfig(cfgFile string) {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// 1. Define config filename default
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
+func InitConfig(cfgDir string) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
 
-		// 2. Define search paths based on OS
+	var selectedConfigDir string
+
+	if cfgDir != "" {
+		// Use specific config directory
+		selectedConfigDir = cfgDir
+		viper.AddConfigPath(cfgDir)
+	} else {
+		// Default search paths
 		if runtime.GOOS == "linux" {
 			viper.AddConfigPath("/etc/google-photos-backup/")
 			viper.AddConfigPath("$HOME/.config/google-photos-backup")
@@ -48,6 +50,13 @@ func InitConfig(cfgFile string) {
 			home, _ := os.UserHomeDir()
 			viper.AddConfigPath(filepath.Join(home, ".config", "google-photos-backup"))
 			viper.AddConfigPath(".") // Search in current folder too
+		}
+
+		home, err := os.UserHomeDir()
+		if err == nil {
+			selectedConfigDir = filepath.Join(home, ".config", "google-photos-backup")
+		} else {
+			selectedConfigDir = "."
 		}
 	}
 
@@ -61,11 +70,9 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("rclone_remote", "drive:")
 	viper.SetDefault("email_alert_to", "")
 
-	// Define default path for token inside config directory
-	if home, err := os.UserHomeDir(); err == nil {
-		defaultTokenPath := filepath.Join(home, ".config", "google-photos-backup", "token.json")
-		viper.SetDefault("token_path", defaultTokenPath)
-	}
+	// Define token path implicitly inside the resolved config directory
+	defaultTokenPath := filepath.Join(selectedConfigDir, "token.json")
+	viper.SetDefault("token_path", defaultTokenPath)
 
 	// 4. Attempt to read
 	if err := viper.ReadInConfig(); err != nil {

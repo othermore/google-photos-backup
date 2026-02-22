@@ -23,7 +23,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ~/.config/google-photos-backup/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config-dir", "", "Configuration directory (default is ~/.config/google-photos-backup). Holds config.yaml and browser tokens.")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().Bool("non-interactive", false, "Disable interactive UI (progress bars)")
 	rootCmd.PersistentFlags().String("log", "", "Path to global log file")

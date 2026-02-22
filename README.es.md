@@ -133,12 +133,12 @@ La configuración se almacena en el archivo `config.yaml`. Por defecto, la herra
 * **Linux**: `/etc/google-photos-backup/` o `~/.config/google-photos-backup/`
 * **macOS**: `~/.config/google-photos-backup/` o en el directorio actual `./`
 
-### Gestionar Varias Cuentas (El parámetro `--config`)
-Puedes gestionar backups de varias cuentas de Google distintas creando archivos de configuración separados para cada una. Usa el parámetro global `--config` con cualquier comando para especificar qué configuración utilizar:
+### Gestionar Varias Cuentas (El parámetro `--config-dir`)
+Puedes gestionar backups de varias cuentas de Google distintas creando directorios de configuración separados para cada una. Esto asegura que los tokens del navegador estén aislados. Usa el parámetro global `--config-dir` con cualquier comando para especificar qué directorio utilizar:
 ```bash
 # Ejemplo: Respaldando una segunda cuenta con su propia configuración
-./gpb --config ~/.config/gpb/cuenta2.yaml drive download
-./gpb --config ~/.config/gpb/cuenta2.yaml tool configure
+./gpb --config-dir ~/.config/gpb/cuenta2 tool configure
+./gpb --config-dir ~/.config/gpb/cuenta2 drive download
 ```
 Este parámetro es global y funciona con absolutamente todos los comandos (`drive`, `direct`, `tool`, `import`).
 
