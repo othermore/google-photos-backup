@@ -30,7 +30,7 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
 Puedes instalar la herramienta descargando un binario precompilado o compilándola tú mismo desde el código fuente.
 
 ### Método 1: Descargar una Release (Recomendado)
-Puedes descargar la última versión compilada para Linux (amd64, arm64) y macOS (Intel, Apple Silicon) directamente desde la **[página de Releases](https://github.com/toniomg/google-photos-backup/releases)**.
+Puedes descargar la última versión compilada para Linux (amd64, arm64) y macOS (Intel, Apple Silicon) directamente desde la **[página de Releases](https://github.com/othermore/google-photos-backup/releases)**.
 
 1. Descarga el archivo `.tar.gz` correspondiente a tu sistema operativo.
 2. Descomprímelo y coloca el archivo `gpb` en una ruta dentro de tu PATH (por ejemplo, `/usr/local/bin`).
@@ -41,7 +41,7 @@ Puedes descargar la última versión compilada para Linux (amd64, arm64) y macOS
 Alternativamente, puedes clonar el repositorio y compilar la herramienta:
 
 ```bash
-git clone https://github.com/toniomg/google-photos-backup.git
+git clone https://github.com/othermore/google-photos-backup.git
 cd google-photos-backup
 go build -o gpb main.go
 chmod +x gpb
@@ -70,6 +70,9 @@ Esto configurará tu:
 ## Herramienta de Backup Híbrido para Google Photos (gpb) v0.9.0
 
 Una herramienta por línea de comandos escrita en Go que automatiza las copias de seguridad de Google Photos mediante Takeout. Descarga y extrae archivos de forma incremental en una estructura de carpetas por año/mes (`Backup/AAAA/MM`), mientras elimina automáticamente el **100% de los duplicados**, tanto dentro del lote actual como en todo el archivo histórico, utilizando "hardlinks" que ocupan un tamaño de cero bytes.
+
+> **👋 ¿Estás usando `gpb` o te ha parecido interesante?**
+> ¡Nos encantaría saber de ti! Por favor, considera [dejarnos un mensaje en los Issues](https://github.com/othermore/google-photos-backup/issues) para decírnoslo o compartir tu opinión. ¡Tu apoyo es lo que nos motiva! Echa un vistazo a [CONTRIBUTING.md](CONTRIBUTING.md) para ver cómo puedes ayudar (en inglés).
 
 ## Uso
 

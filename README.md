@@ -1,7 +1,12 @@
 > [!IMPORTANT]
 > This is still in development. Do not use it yet (or do at your own risk). I expect to have a first release by end of March 2026.
 
-# Google Photos Backup (Linux/macOS)
+# Google Photos Hybrid Backup Tool (gpb) v0.9.0
+
+A command-line tool written in Go that automates Google Photos Takeout backups, incrementally downloading and extracting files into a year/month folder structure structure (`Backup/YYYY/MM`), whilst automatically eliminating 100% of duplicates both within the current backup batch and across the entire historical backup archive using zero-space hardlinks.
+
+> **👋 Are you using `gpb` or does it look interesting to you?**
+> We'd love to hear from you! Please consider [dropping a message in this issue](https://github.com/othermore/google-photos-backup/issues) to let us know, or to share your feedback. Your support keeps the project motivated! Check out [CONTRIBUTING.md](CONTRIBUTING.md) to see how you can help.
 
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
@@ -29,7 +34,7 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 You can install the tool by downloading a pre-compiled binary or building it yourself.
 
 ### Method 1: Download from Releases (Recommended)
-You can download the latest pre-compiled binaries for Linux (amd64, arm64) and macOS (Intel, Apple Silicon) directly from the **[Releases page](https://github.com/toniomg/google-photos-backup/releases)**.
+You can download the latest pre-compiled binaries for Linux (amd64, arm64) and macOS (Intel, Apple Silicon) directly from the **[Releases page](https://github.com/othermore/google-photos-backup/releases)**.
 
 1. Download the `.tar.gz` for your operating system.
 2. Extract it and place the `gpb` binary in a directory in your PATH (e.g., `/usr/local/bin`).
@@ -40,7 +45,7 @@ You can download the latest pre-compiled binaries for Linux (amd64, arm64) and m
 Alternatively, you can clone the repository and build the binary yourself.
 
 ```bash
-git clone https://github.com/toniomg/google-photos-backup.git
+git clone https://github.com/othermore/google-photos-backup.git
 cd google-photos-backup
 go build -o gpb main.go
 chmod +x gpb
