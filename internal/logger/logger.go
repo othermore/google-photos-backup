@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -21,8 +22,17 @@ func InitLogFile(path string) error {
 	if logFile != nil {
 		logFile.Close()
 	}
+
+	// Extract the directory and try to create it if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		fmt.Printf("⚠️  Warning: could not create log directory: %v\n", err)
+		return err
+	}
+
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		fmt.Printf("⚠️  Warning: could not initialize log file: %v\n", err)
 		return err
 	}
 	logFile = f
