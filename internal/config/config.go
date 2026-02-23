@@ -13,9 +13,6 @@ import (
 type Config struct {
 	UserID               string `mapstructure:"user_id"`
 	WorkingPath          string `mapstructure:"working_path"`
-	ClientID             string `mapstructure:"client_id"`
-	ClientSecret         string `mapstructure:"client_secret"`
-	TokenPath            string `mapstructure:"token_path"`
 	EmailAlertTo         string `mapstructure:"email_alert_to"`         // Destination email for alerts (uses system msmtp)
 	FixAmbiguousMetadata string `mapstructure:"fix_ambiguous_metadata"` // "yes", "no", "interactive"
 	BackupPath           string `mapstructure:"backup_path"`            // Where to store the final organized photos
@@ -34,11 +31,8 @@ func InitConfig(cfgDir string) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
-	var selectedConfigDir string
-
 	if cfgDir != "" {
 		// Use specific config directory
-		selectedConfigDir = cfgDir
 		viper.AddConfigPath(cfgDir)
 	} else {
 		// Default search paths
@@ -50,13 +44,6 @@ func InitConfig(cfgDir string) {
 			viper.AddConfigPath(filepath.Join(home, ".config", "google-photos-backup"))
 			viper.AddConfigPath(".") // Search in current folder too
 		}
-
-		home, err := os.UserHomeDir()
-		if err == nil {
-			selectedConfigDir = filepath.Join(home, ".config", "google-photos-backup")
-		} else {
-			selectedConfigDir = "."
-		}
 	}
 
 	// 3. Default values
@@ -67,10 +54,6 @@ func InitConfig(cfgDir string) {
 	viper.SetDefault("immich_master_path", "immich-master")
 	viper.SetDefault("rclone_remote", "drive:")
 	viper.SetDefault("email_alert_to", "")
-
-	// Define token path implicitly inside the resolved config directory
-	defaultTokenPath := filepath.Join(selectedConfigDir, "token.json")
-	viper.SetDefault("token_path", defaultTokenPath)
 
 	// 4. Attempt to read
 	if err := viper.ReadInConfig(); err != nil {
