@@ -49,7 +49,22 @@ var messages = map[string]map[string]string{
 		"en": "Behavior for ambiguous metadata matches (yes/no/interactive) [default: %s]",
 		"es": "Comportamiento para coincidencias de metadatos ambiguas (yes/no/interactive) [por defecto: %s]",
 	},
-
+	"prompt_working_dir": {
+		"en": "Enter the working directory (for downloads/processing) [default: %s]: ",
+		"es": "Introduce el directorio de trabajo (para descargas/procesado) [por defecto: %s]: ",
+	},
+	"prompt_backup_path": {
+		"en": "Enter the destination path to store extracted photos",
+		"es": "Introduce la ruta de destino donde guardar las fotos extraídas",
+	},
+	"prompt_email_alert": {
+		"en": "Email for alerts (uses system msmtp) [%s]: ",
+		"es": "Email para notificaciones (usando msmtp del sistema) [%s]: ",
+	},
+	"ssh_headless_tips": {
+		"en": "\n=======================================================================================\n 💡 TIPS FOR REMOTE/HEADLESS SERVERS (SSH):\n  If the browser fails to open or gets stuck because your server has no GUI/Desktop,\n  please run the 'configure' command on your local machine using --config-dir,\n  log in there, and then copy the entire resulting folder to your server via SCP.\n  -> Check the README 'Headless / Remote Servers' section for a step-by-step guide.\n=======================================================================================\n",
+		"es": "\n=======================================================================================\n 💡 CONSEJOS PARA SERVIDORES REMOTOS (SSH):\n  Si el navegador no se abre o se queda congelado porque tu servidor no tiene entorno gráfico,\n  por favor ejecuta 'configure' en tu PC personal usando --config-dir,\n  inicia sesión desde ahí, y luego copia la carpeta completa de vuelta al servidor por SCP.\n  -> Revisa la sección 'Servidores Remotos' del README para una guía paso a paso.\n=======================================================================================\n",
+	},
 	"prompt_rclone_remote": {
 		"en": "Enter your rclone remote name [default: %s]",
 		"es": "Introduce el nombre de tu remoto rclone [por defecto: %s]",

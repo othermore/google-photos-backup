@@ -31,7 +31,8 @@ var configureCmd = &cobra.Command{
 		fmt.Println("")
 
 		// 1. Working Dir (Download/Process)
-		workingPath := prompt(i18n.T("prompt_working_dir"), config.AppConfig.WorkingPath)
+		workingPrompt := fmt.Sprintf(i18n.T("prompt_working_dir"), config.AppConfig.WorkingPath)
+		workingPath := prompt(workingPrompt, config.AppConfig.WorkingPath)
 		absWorkingPath, _ := filepath.Abs(workingPath)
 
 		// 2. Rclone Remote (For 'drive' command)
@@ -45,18 +46,8 @@ var configureCmd = &cobra.Command{
 
 		// 2.5 Email Alert To (New)
 		currentEmail := config.AppConfig.EmailAlertTo
-		emailPrompt := fmt.Sprintf("Email for alerts (uses system msmtp) [%s]: ", currentEmail)
-		// We don't have i18n for this yet, hardcoding or adding later.
-		// For now simple prompt.
-		if currentEmail != "" {
-			emailPrompt = fmt.Sprintf("Email for alerts (uses system msmtp) [default: %s]: ", currentEmail)
-		}
-		// Simple prompt wrapper doesn't support formatted string in prompt usually, it prints it.
-		// logic in prompt() function (not shown) usually prints.
-		// Let's use the pattern from line 42.
+		emailPrompt := fmt.Sprintf(i18n.T("prompt_email_alert"), currentEmail)
 
-		// Actually let's just reuse prompt()
-		// We need to add i18n key for email prompt later.
 		emailAlertTo := prompt(emailPrompt, currentEmail)
 
 		// 3. Fix Ambiguous Metadata
@@ -131,13 +122,7 @@ func loginFlow(workingPath string) {
 	fmt.Println(i18n.T("login_start"))
 	fmt.Println(i18n.T("browser_open"))
 
-	fmt.Println("\n=======================================================================================")
-	fmt.Println(" 💡 TIPS FOR REMOTE/HEADLESS SERVERS (SSH):")
-	fmt.Println("  If the browser fails to open or gets stuck because your server has no GUI/Desktop,")
-	fmt.Println("  please run the 'configure' command on your local machine using --config-dir,")
-	fmt.Println("  log in there, and then copy the entire resulting folder to your server via SCP.")
-	fmt.Println("  -> Check the README 'Headless / Remote Servers' section for a step-by-step guide.")
-	fmt.Println("=======================================================================================\n")
+	fmt.Print(i18n.T("ssh_headless_tips"))
 
 	// Usamos el directorio de backup para guardar la sesión del navegador (carpeta 'browser_data')
 	userDataDir := filepath.Join(workingPath, "browser_data")
