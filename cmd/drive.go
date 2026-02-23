@@ -42,8 +42,7 @@ var driveDownloadCmd = &cobra.Command{
 
 		// 1. Config Check
 		if config.AppConfig.BackupPath == "" {
-			logger.Error(i18n.T("backup_dir_error"))
-			return
+			logger.Fatalf(i18n.T("backup_dir_error"))
 		}
 
 		// 2. Initialize Rclone
@@ -53,8 +52,7 @@ var driveDownloadCmd = &cobra.Command{
 		logger.Info(i18n.T("drive_check"))
 		files, err := rc.ListExports()
 		if err != nil {
-			logger.Error(i18n.T("drive_list_fail"), err)
-			return
+			logger.Fatalf(i18n.T("drive_list_fail"), err)
 		}
 
 		eng := engine.New(config.AppConfig.WorkingPath, config.AppConfig.BackupPath)
@@ -308,7 +306,7 @@ func checkStaleAndAlert() {
 			logger.LogToFile("ALERT: Freshness alert email sent to %s", config.AppConfig.EmailAlertTo)
 			os.WriteFile(alertStatePath, []byte(time.Now().Format(time.RFC3339)), 0644)
 		} else {
-			logger.Error(i18n.T("drive_alert_fail"), err)
+			logger.Fatalf(i18n.T("drive_alert_fail"), err)
 		}
 	}
 }
