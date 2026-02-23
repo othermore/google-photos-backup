@@ -66,21 +66,37 @@ func LogToFile(format string, args ...interface{}) {
 // Debug prints only if verbose mode is enabled
 func Debug(format string, args ...interface{}) {
 	if viper.GetBool("verbose") {
-		fmt.Printf("[DEBUG] "+format+"\n", args...)
+		msg := fmt.Sprintf("[DEBUG] "+format, args...)
+		fmt.Println(msg)
+		LogToFile("%s", msg)
 	}
 }
 
 // Info always prints
 func Info(format string, args ...interface{}) {
-	fmt.Printf(format+"\n", args...)
+	msg := fmt.Sprintf(format, args...)
+	fmt.Println(msg)
+	LogToFile("INFO: %s", msg)
 }
 
 // Warn always prints with a warning icon
 func Warn(format string, args ...interface{}) {
-	fmt.Printf("⚠️  "+format+"\n", args...)
+	msg := fmt.Sprintf(format, args...)
+	fmt.Println("⚠️  " + msg)
+	LogToFile("WARN: %s", msg)
 }
 
 // Error always prints
 func Error(format string, args ...interface{}) {
-	fmt.Printf("❌ "+format+"\n", args...)
+	msg := fmt.Sprintf(format, args...)
+	fmt.Println("❌ " + msg)
+	LogToFile("ERROR: %s", msg)
+}
+
+// Fatalf prints an error and exits the program with code 1
+func Fatalf(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	fmt.Println("❌ " + msg)
+	LogToFile("FATAL: %s", msg)
+	os.Exit(1)
 }
