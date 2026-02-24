@@ -122,6 +122,12 @@ Si has descargado manualmente ZIPs de Takeout, puedes importarlos directamente:
 ./gpb import /ruta/a/carpeta_con_zips
 ```
 
+Por defecto, el comando `import` copia los archivos ZIP a un directorio de trabajo temporal para proteger tus archivos originales en bruto. Si tienes poco espacio en disco, puedes usar el parámetro `--move-original` para mover los archivos en lugar de copiarlos (los archivos originales desaparecerán tras ser procesados con éxito):
+
+```bash
+./gpb import /ruta/a/carpeta_con_zips --move-original
+```
+
 ## Almacenamiento y Deduplicación
 
 La herramienta organiza los archivos en una estructura `Backup/AAAA/MM`.

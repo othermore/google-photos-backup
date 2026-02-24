@@ -125,6 +125,12 @@ If you have manually downloaded Takeout ZIPs, you can import them directly:
 ./gpb import /path/to/folder_with_zips
 ```
 
+By default, the `import` command copies the ZIP files to a temporary working directory to protect your original files. If you are low on disk space, you can use the `--move-original` flag to move the files instead of copying them (the original files will be deleted after successful processing):
+
+```bash
+./gpb import /path/to/folder_with_zips --move-original
+```
+
 ## Storage & Deduplication
 
 The tool organizes files into a `Backup/YYYY/MM` structure.

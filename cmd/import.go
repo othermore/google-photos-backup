@@ -83,14 +83,29 @@ var importCmd = &cobra.Command{
 			// For Manual Import, maybe we should just Unzip and NOT delete the source zip?
 			// Engine.ProcessZip deletes it.
 
-			// Let's Copy to WorkingDir/temp_import first.
+			// Check if we should move or copy
+			moveOriginal, _ := cmd.Flags().GetBool("move-original")
+
 			tempZip := filepath.Join(config.AppConfig.WorkingPath, "temp_import", filepath.Base(zipPath))
 			os.MkdirAll(filepath.Dir(tempZip), 0755)
 
-			logger.Info(i18n.T("import_copying"))
-			if err := copyFileLocal(zipPath, tempZip); err != nil {
-				logger.Error(i18n.T("import_copy_fail"), err)
-				continue
+			if moveOriginal {
+				logger.Info("🚚 Moving original zip: %s", filepath.Base(zipPath))
+				if err := os.Rename(zipPath, tempZip); err != nil {
+					// Fallback to copy if rename fails across partitions
+					logger.Warn("Rename failed (probably different partition), falling back to copy: %v", err)
+					if copyErr := copyFileLocal(zipPath, tempZip); copyErr != nil {
+						logger.Error(i18n.T("import_copy_fail"), copyErr)
+						continue
+					}
+					os.Remove(zipPath) // Manually delete after successful fallback copy
+				}
+			} else {
+				logger.Info(i18n.T("import_copying"))
+				if err := copyFileLocal(zipPath, tempZip); err != nil {
+					logger.Error(i18n.T("import_copy_fail"), err)
+					continue
+				}
 			}
 
 			if err := eng.ProcessZipWithIndex(tempZip, filepath.Dir(tempZip)); err != nil {
@@ -136,4 +151,5 @@ func copyFileLocal(src, dst string) (err error) {
 
 func init() {
 	rootCmd.AddCommand(importCmd)
+	importCmd.Flags().Bool("move-original", false, "Move the original zip files to the working directory instead of copying them (saves space)")
 }
