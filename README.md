@@ -175,7 +175,7 @@ This is particularly useful when running the tool automatically via Cron, as it 
 This flag is supported by the `drive download`, `direct download`, and `import` commands.
 
 ### Configuration Parameters
-*   `working_path`: Directory for temporary files, processing, and browser session data (`browser_data/`).
+*   `working_path`: Directory for temporary files, processing, and browser session data (`browser_data/`). **Pro tip**: If your final destination (`backup_path`) is a remote NAS or a slow hard drive (HDD), set your `working_path` to a fast local drive (SSD/NVMe). The tool will use this drive first to download, unzip and do all the heavy deduplication processing at maximum speed before transferring the final photos to the slower storage, saving hours of networking and disk bottlenecks.
 *   `backup_path`: Final destination for organized photos (`Backup/YYYY/MM/...`).
 *   `rclone_remote`: Name of your rclone remote (e.g., `drive:`).
 *   `email_alert_to`: Email address to receive stale backup alerts (requires `msmtp`).

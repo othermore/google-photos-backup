@@ -172,7 +172,7 @@ Esto es especialmente útil cuando se ejecuta la herramienta automáticamente v�
 Este parámetro está soportado por los comandos `drive download`, `direct download` e `import`.
 
 ### Parámetros de Configuración
-*   `working_path`: Directorio para archivos temporales, procesamiento y datos de sesión del navegador (`browser_data/`).
+*   `working_path`: Directorio para archivos temporales, procesamiento y datos de sesión del navegador (`browser_data/`). **Pro tip**: Si tu destino final (`backup_path`) es un NAS remoto o un disco duro lento (HDD), configura tu `working_path` en un disco local rápido (SSD/NVMe). La herramienta usará esta unidad primero para descargar, descomprimir y hacer todo el esfuerzo de deduplicación pesado a máxima velocidad antes de transferir las fotos resultantes al almacenamiento lento, ahorrándote horas de red y cuello de botella.
 *   `backup_path`: Destino final de las fotos organizadas (`Backup/AAAA/MM/...`).
 *   `rclone_remote`: Nombre de tu remoto rclone (ej. `drive:`).
 *   `email_alert_to`: Dirección de correo electrónico para recibir alertas de backups obsoletos (requiere `msmtp`).
