@@ -57,7 +57,6 @@ var processCmd = &cobra.Command{
 
 		pm := processor.NewManager(inputDir, outputDir, albumsDir)
 		pm.DeleteOrigin, _ = cmd.Flags().GetBool("delete-origin")
-		pm.ForceMetadata, _ = cmd.Flags().GetBool("force-metadata")
 		pm.ForceExtraction, _ = cmd.Flags().GetBool("force-extract")
 		pm.ForceDedup, _ = cmd.Flags().GetBool("force-dedup")
 		pm.TargetExport, _ = cmd.Flags().GetString("export")
@@ -90,7 +89,6 @@ func init() {
 	processCmd.Flags().Bool("force", false, "Force processing even if already done")
 
 	// Granular Force Flags
-	processCmd.Flags().Bool("force-metadata", false, "Force metadata correction (dates) for already processed exports")
 	processCmd.Flags().Bool("force-extract", false, "Force extraction for already processed exports")
 	processCmd.Flags().Bool("force-dedup", false, "Force global deduplication check")
 	processCmd.Flags().String("export", "", "Process only this specific Export ID")

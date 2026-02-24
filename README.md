@@ -113,6 +113,7 @@ Run this command via **Cron** (e.g., daily). It will passively check for new exp
 ### 3. Technical Tools
 The `tool` command regroups all configuration and maintenance tasks:
 * `gpb tool configure`: Interactive configuration wizard.
+* `gpb tool fix-metadata`: Retroactively corrects filesystem modification dates using JSON sidecars.
 * `gpb tool rebuild-index`: Rebuilds local indices.
 * `gpb tool fix-hardlinks`: Validates and repairs cross-volume hardlinks.
 * `gpb tool rebuild-immich-master`: Synchronizes snapshot with an `immich-master` read-only repository.

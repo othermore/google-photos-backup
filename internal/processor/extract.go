@@ -67,10 +67,9 @@ func (m *Manager) ProcessExports() (bool, error) {
 
 		// Logic for what parts to run
 		shouldExtract := m.ForceExtraction || !isDone
-		shouldMetadata := m.ForceMetadata || shouldExtract
 		shouldDedup := m.ForceDedup // Dedup implies scanning if we are forcing it
 
-		if !shouldExtract && !shouldMetadata && !shouldDedup {
+		if !shouldExtract && !shouldDedup {
 			continue
 		}
 
@@ -103,8 +102,8 @@ func (m *Manager) ProcessExports() (bool, error) {
 				continue
 			}
 
-			// Extraction Step OR Forced Scan (for metadata/dedup update)
-			if shouldExtract || shouldMetadata || shouldDedup {
+			// Extraction Step OR Forced Scan (for dedup update)
+			if shouldExtract || shouldDedup {
 				// Scan Existing Files
 				// Optimization:
 				// 1. If ForceExtraction is ON, we re-extract (and re-hash) everything from stream. ScanRaw hashing is duplicate work. -> needHash = false
@@ -112,7 +111,7 @@ func (m *Manager) ProcessExports() (bool, error) {
 				// 3. If ForceDedup is ON, we need hashes. -> needHash = true (unless ForceExtraction overrides it)
 
 				// Logic: We need disk hashes if we are keeping existing files (Resume or Dedup Check)
-				// We don't need them if we are about to blow them away (ForceExtraction) or if we only want metadata.
+				// We don't need them if we are about to blow them away (ForceExtraction).
 				needHash := (shouldExtract || shouldDedup) && !m.ForceExtraction
 
 				// If we are forcing a deep deduplication check, we must DISCARD the loaded index
@@ -137,7 +136,7 @@ func (m *Manager) ProcessExports() (bool, error) {
 			}
 
 			// Metadata Correction Step
-			if shouldMetadata {
+			if shouldExtract {
 				logger.Info("📅 Correcting metadata for export %s...", entry.ID)
 				m.CorrectMetadata()
 			}
@@ -146,7 +145,7 @@ func (m *Manager) ProcessExports() (bool, error) {
 			m.SaveState(exportDir)
 
 			// Mark the entire export as processed in the global state
-			if shouldExtract && shouldMetadata {
+			if shouldExtract {
 				m.ProcessedExports[entry.ID] = true
 				m.SaveState(m.OutputDir)
 			}

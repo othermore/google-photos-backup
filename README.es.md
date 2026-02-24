@@ -111,6 +111,7 @@ Ejecuta este comando vía **Cron** (ej. diariamente). Revisará de forma pasiva 
 ### 3. Herramientas Técnicas
 El comando `tool` agrupa todas las tareas de configuración y mantenimiento:
 * `gpb tool configure`: Asistente interactivo de configuración.
+* `gpb tool fix-metadata`: Aplica retroactivamente las fechas de modificación del sistema usando los JSON asociados.
 * `gpb tool rebuild-index`: Reconstruye los índices locales.
 * `gpb tool fix-hardlinks`: Valida y repara los enlaces duros entre volúmenes.
 * `gpb tool rebuild-immich-master`: Sincroniza un snapshot con un repositorio de solo lectura `immich-master`.
