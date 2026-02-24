@@ -32,6 +32,26 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 	totalFiles := 0
 	rehashedFiles := 0
 
+	// 2. Pre-build an Inode cache from existing indexes
+	// This helps us avoid rehashing files that were recently hardlinked (changed Inode)
+	// but the NEW Inode is already known in the existing index elsewhere.
+	inodeMap := make(map[uint64]string)
+
+	if existingIndex != nil {
+		for _, entry := range existingIndex.Files {
+			if entry.Inode != 0 && entry.Hash != "" {
+				inodeMap[entry.Inode] = entry.Hash
+			}
+		}
+	}
+	if cacheIndex != nil {
+		for _, entry := range cacheIndex.Files {
+			if entry.Inode != 0 && entry.Hash != "" {
+				inodeMap[entry.Inode] = entry.Hash
+			}
+		}
+	}
+
 	err = filepath.Walk(snapshotPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -73,7 +93,7 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 			}
 		}
 
-		// 2. Check local existingIndex (Requires Inode/ModTime/Size match)
+		// 2. Check local existingIndex strictly (Requires Inode/ModTime/Size match)
 		if hash == "" {
 			if existingEntry, ok := existingIndex.Get(relPath); ok {
 				if existingEntry.Inode == inode &&
@@ -81,6 +101,15 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 					existingEntry.Size == info.Size() {
 					hash = existingEntry.Hash
 				}
+			}
+		}
+
+		// 3. Fallback: Check if the Inode is already known in the index
+		// This happens after fix-hardlinks: the file's Inode changed to match another
+		// already-indexed file. We can trust the known Inode's hash.
+		if hash == "" {
+			if knownHash, ok := inodeMap[inode]; ok && knownHash != "" {
+				hash = knownHash
 			}
 		}
 
@@ -102,6 +131,11 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 			ModTime: info.ModTime(),
 			Inode:   inode,
 		})
+
+		// Register new Inodes dynamically during the walk
+		if inode != 0 && hash != "" {
+			inodeMap[inode] = hash
+		}
 
 		return nil
 	})
