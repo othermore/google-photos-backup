@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	"google-photos-backup/internal/config"
+	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/processor"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var fixMetadataCmd = &cobra.Command{
@@ -17,6 +19,16 @@ var fixMetadataCmd = &cobra.Command{
 	Short: "Retroactively apply JSON metadata fixes to snapshots",
 	Long:  `Scans the target directory or all snapshot directories in the main Backup location, matching media files with Google Takeout JSON sidecars to correct their filesystem modification dates. This strictly uses the same advanced heuristic engine as the import/drive process to find the correct JSON and only alters filesystem dates (not EXIF).`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if logPath := viper.GetString("log"); logPath != "" {
+			if err := logger.InitLogFile(logPath); err == nil {
+				defer logger.CloseLogFile()
+				logger.LogToFile("==================================================")
+				logger.LogToFile("START: Command 'fix-metadata' initiated")
+			}
+		}
+
+		logger.Info(i18n.T("fix_metadata_start"))
+
 		targetDir, _ := cmd.Flags().GetString("target-dir")
 
 		// Create a clean instance of Manager using global ambiguous config
@@ -30,10 +42,10 @@ var fixMetadataCmd = &cobra.Command{
 		if targetDir != "" {
 			dirsToProcess = append(dirsToProcess, targetDir)
 		} else {
-			logger.Info("🔍 Discovering snapshots in Backup Path: %s", config.AppConfig.BackupPath)
+			logger.Info(i18n.T("fix_metadata_backup_path"), config.AppConfig.BackupPath)
 			entries, err := os.ReadDir(config.AppConfig.BackupPath)
 			if err != nil {
-				logger.Fatalf("Failed to read backup directory: %v", err)
+				logger.Fatalf(i18n.T("fix_metadata_read_fail"), err)
 			}
 			for _, entry := range entries {
 				// Avoid . and the master dir.
@@ -44,13 +56,13 @@ var fixMetadataCmd = &cobra.Command{
 		}
 
 		if len(dirsToProcess) == 0 {
-			logger.Info("⚠️  No directories found to process.")
+			logger.Info(i18n.T("fix_metadata_no_dirs"))
 			return
 		}
 
 		for _, dir := range dirsToProcess {
 			logger.Info("==================================================")
-			logger.Info("📂 Target Directory: %s", dir)
+			logger.Info(i18n.T("fix_metadata_target"), dir)
 
 			// Reset the FileIndex map for this run
 			pm.FileIndex = make(map[string]processor.FileMetadata)
@@ -71,7 +83,7 @@ var fixMetadataCmd = &cobra.Command{
 			})
 
 			if err != nil {
-				logger.Error("❌ Failed to scan directory %s: %v", dir, err)
+				logger.Error(i18n.T("fix_metadata_scan_fail"), dir, err)
 				continue
 			}
 
@@ -79,7 +91,8 @@ var fixMetadataCmd = &cobra.Command{
 			pm.CorrectMetadata()
 		}
 
-		logger.Info("✅ fix-metadata pass completed.")
+		logger.Info(i18n.T("fix_metadata_complete"))
+		logger.LogToFile("SUMMARY: fix-metadata pass completed.")
 	},
 }
 

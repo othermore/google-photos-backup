@@ -1163,6 +1163,83 @@ var messages = map[string]map[string]string{
 		"en": "failed to send email via msmtp: %v, output: %s",
 		"es": "fallo al enviar email vía msmtp: %v, salida: %s",
 	},
+	// --- New Commands & Enhancements ---
+	"fix_metadata_start": {
+		"en": "Starting metadata fix pass...",
+		"es": "Iniciando pase de corrección de metadatos...",
+	},
+	"fix_metadata_backup_path": {
+		"en": "🔍 Discovering snapshots in Backup Path: %s",
+		"es": "🔍 Descubriendo snapshots en la ruta de Backup: %s",
+	},
+	"fix_metadata_read_fail": {
+		"en": "Failed to read backup directory: %v",
+		"es": "Fallo al leer directorio de backup: %v",
+	},
+	"fix_metadata_no_dirs": {
+		"en": "⚠️  No directories found to process.",
+		"es": "⚠️  No se encontraron directorios para procesar.",
+	},
+	"fix_metadata_target": {
+		"en": "📂 Target Directory: %s",
+		"es": "📂 Directorio Objetivo: %s",
+	},
+	"fix_metadata_scan_fail": {
+		"en": "❌ Failed to scan directory %s: %v",
+		"es": "❌ Fallo al escanear directorio %s: %v",
+	},
+	"fix_metadata_complete": {
+		"en": "✅ fix-metadata pass completed.",
+		"es": "✅ Pase de fix-metadata completado.",
+	},
+	"rebuild_index_start": {
+		"en": "🏗️  Starting Index Rebuild...",
+		"es": "🏗️  Iniciando Reconstrucción de Índices...",
+	},
+	"rebuild_index_target": {
+		"en": "📂 Rebuilding index exclusively for: %s",
+		"es": "📂 Reconstruyendo índice exclusivamente para: %s",
+	},
+	"rebuild_index_fail": {
+		"en": "❌ Failed to index %s: %v",
+		"es": "❌ Fallo al indexar %s: %v",
+	},
+	"rebuild_index_target_complete": {
+		"en": "✅ Index Rebuild Complete for %s.",
+		"es": "✅ Reconstrucción de índice completada para %s.",
+	},
+	"rebuild_index_read_fail": {
+		"en": "Error reading backup dir: %v",
+		"es": "Error leyendo directorio de backup: %v",
+	},
+	"rebuild_index_no_snapshots": {
+		"en": "⚠️  No snapshots found.",
+		"es": "⚠️  No se encontraron snapshots.",
+	},
+	"rebuild_index_found_count": {
+		"en": "found %d snapshots to process",
+		"es": "encontrados %d snapshots para procesar",
+	},
+	"rebuild_index_complete": {
+		"en": "✅ Index Rebuild Complete. Processed %d/%d snapshots.",
+		"es": "✅ Reconstrucción de índice completada. Procesados %d/%d snapshots.",
+	},
+	"import_move_zip": {
+		"en": "🚚 Moving original zip: %s",
+		"es": "🚚 Moviendo zip original: %s",
+	},
+	"import_rename_fallback": {
+		"en": "Rename failed (probably different partition), falling back to copy: %v",
+		"es": "Renombrado fallido (probablemente diferente partición), usando copia como alternativa: %v",
+	},
+	"immich_split_part1": {
+		"en": "🗂️  Splitting %s into Part_1 (%d files)...",
+		"es": "🗂️  Dividiendo %s en Part_1 (%d archivos)...",
+	},
+	"immich_split_next": {
+		"en": "🗂️  %s reached 500 files, overflowing to Part_%d...",
+		"es": "🗂️  %s alcanzó 500 archivos, desbordando a Part_%d...",
+	},
 }
 
 // Init detecta el idioma del sistema

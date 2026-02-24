@@ -12,6 +12,7 @@ import (
 
 	"strings"
 
+	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/registry"
 )
@@ -230,7 +231,7 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 				}
 			}
 
-			logger.Info("🗂️  Splitting %s into Part_1 (%d files)...", ym, len(toMove))
+			logger.Info(i18n.T("immich_split_part1"), ym, len(toMove))
 
 			for _, mEntry := range toMove {
 				oldAbs := filepath.Join(masterRoot, mEntry.RelPath)
@@ -254,7 +255,7 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 		// SPLIT LOGIC: If the current MaxPart has >= 500 files, create next Part
 		if state.MaxPart > 0 && state.PartCounts[state.MaxPart] >= 500 {
 			state.MaxPart++
-			logger.Info("🗂️  %s reached 500 files, overflowing to Part_%d...", ym, state.MaxPart)
+			logger.Info(i18n.T("immich_split_next"), ym, state.MaxPart)
 		}
 
 		var destRelDir string

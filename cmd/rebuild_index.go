@@ -19,16 +19,24 @@ var rebuildIndexCmd = &cobra.Command{
 	Short: "Rebuild index.json for all snapshots",
 	Long:  `Scans all timestamped snapshots in the backup directory and generates/updates their index.json file. It uses Inode optimization to speed up re-indexing.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		logger.Info("🏗️  Starting Index Rebuild...")
+		if logPath := viper.GetString("log"); logPath != "" {
+			if err := logger.InitLogFile(logPath); err == nil {
+				defer logger.CloseLogFile()
+				logger.LogToFile("==================================================")
+				logger.LogToFile("START: Command 'rebuild-index' initiated")
+			}
+		}
+
+		logger.Info(i18n.T("rebuild_index_start"))
 
 		targetDir, _ := cmd.Flags().GetString("target-dir")
 
 		if targetDir != "" {
-			logger.Info("📂 Rebuilding index exclusively for: %s", targetDir)
+			logger.Info(i18n.T("rebuild_index_target"), targetDir)
 			if _, err := processor.EnsureSnapshotIndex(targetDir, nil); err != nil {
-				logger.Error("❌ Failed to index %s: %v", targetDir, err)
+				logger.Error(i18n.T("rebuild_index_fail"), targetDir, err)
 			} else {
-				logger.Info("✅ Index Rebuild Complete for %s.", targetDir)
+				logger.Info(i18n.T("rebuild_index_target_complete"), targetDir)
 			}
 			return
 		}
@@ -47,7 +55,7 @@ var rebuildIndexCmd = &cobra.Command{
 		// 1. List Snapshots
 		entries, err := os.ReadDir(backupPath)
 		if err != nil {
-			logger.Error("Error reading backup dir: %v", err)
+			logger.Error(i18n.T("rebuild_index_read_fail"), err)
 			return
 		}
 
@@ -60,11 +68,11 @@ var rebuildIndexCmd = &cobra.Command{
 		sort.Strings(snapshots)
 
 		if len(snapshots) == 0 {
-			logger.Info("⚠️  No snapshots found.")
+			logger.Info(i18n.T("rebuild_index_no_snapshots"))
 			return
 		}
 
-		logger.Info("found %d snapshots to process", len(snapshots))
+		logger.Info(i18n.T("rebuild_index_found_count"), len(snapshots))
 
 		successCount := 0
 		for _, snapName := range snapshots {
@@ -72,13 +80,14 @@ var rebuildIndexCmd = &cobra.Command{
 			// logger.Info("Indexing snapshot: %s", snapName)
 
 			if _, err := processor.EnsureSnapshotIndex(snapPath, nil); err != nil {
-				logger.Error("Failed to index %s: %v", snapName, err)
+				logger.Error(i18n.T("rebuild_index_fail"), snapName, err)
 			} else {
 				successCount++
 			}
 		}
 
-		logger.Info("✅ Index Rebuild Complete. Processed %d/%d snapshots.", successCount, len(snapshots))
+		logger.Info(i18n.T("rebuild_index_complete"), successCount, len(snapshots))
+		logger.LogToFile("SUMMARY: rebuild-index completed. Processed %d/%d snapshots.", successCount, len(snapshots))
 	},
 }
 

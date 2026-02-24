@@ -90,10 +90,10 @@ var importCmd = &cobra.Command{
 			os.MkdirAll(filepath.Dir(tempZip), 0755)
 
 			if moveOriginal {
-				logger.Info("🚚 Moving original zip: %s", filepath.Base(zipPath))
+				logger.Info(i18n.T("import_move_zip"), filepath.Base(zipPath))
 				if err := os.Rename(zipPath, tempZip); err != nil {
 					// Fallback to copy if rename fails across partitions
-					logger.Warn("Rename failed (probably different partition), falling back to copy: %v", err)
+					logger.Warn(i18n.T("import_rename_fallback"), err)
 					if copyErr := copyFileLocal(zipPath, tempZip); copyErr != nil {
 						logger.Error(i18n.T("import_copy_fail"), copyErr)
 						continue
