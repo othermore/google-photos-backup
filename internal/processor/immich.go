@@ -94,8 +94,10 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 		}
 
 		// 2. Check local existingIndex strictly (Requires Inode/ModTime/Size match)
+		oldHash := ""
 		if hash == "" {
 			if existingEntry, ok := existingIndex.Get(relPath); ok {
+				oldHash = existingEntry.Hash // Keep track of what this file used to be
 				if existingEntry.Inode == inode &&
 					existingEntry.ModTime.Equal(info.ModTime()) &&
 					existingEntry.Size == info.Size() {
@@ -105,10 +107,11 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 		}
 
 		// 3. Fallback: Check if the Inode is already known in the index
-		// This happens after fix-hardlinks: the file's Inode changed to match another
-		// already-indexed file. We can trust the known Inode's hash.
-		if hash == "" {
-			if knownHash, ok := inodeMap[inode]; ok && knownHash != "" {
+		// Very strict optimization: if the new Inode maps to a known file, we ONLY reuse
+		// the hash if it matches the 'oldHash' this file was known to have.
+		// This guarantees it's a deduplication fix and not a file content substitution.
+		if hash == "" && oldHash != "" {
+			if knownHash, ok := inodeMap[inode]; ok && knownHash == oldHash {
 				hash = knownHash
 			}
 		}
