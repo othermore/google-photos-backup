@@ -63,6 +63,7 @@ var driveDownloadCmd = &cobra.Command{
 		}
 
 		processedBatches := 0
+		globalHasErrors := false
 
 		// SCENARIO A: Files Found - Batch Processing
 		if len(files) > 0 {
@@ -164,12 +165,22 @@ var driveDownloadCmd = &cobra.Command{
 					// Download (Move)
 					// Verify rc.MoveFile logic in rclone.go: it moves file to localDir.
 					if err := rc.MoveFile(file.Name, batchWorkDir); err != nil {
-						logger.Error(i18n.T("drive_dl_move_fail"), file.Name, err)
-						logger.LogToFile("ERROR: Failed to download %s: %v", file.Name, err)
-						failed = true
-						continue // Skip processing this file
+						// rclone move failed, but check if the file was downloaded successfully (e.g., Drive deletion failure)
+						localPath := filepath.Join(batchWorkDir, file.Name)
+						if _, statErr := os.Stat(localPath); statErr == nil {
+							logger.Warn("⚠️  rc.MoveFile failed (Drive permissions?), but file downloaded. Proceeding...")
+							logger.LogToFile("WARN: Failed to delete %s from Drive, but download succeeded.", file.Name)
+							globalHasErrors = true
+						} else {
+							logger.Error(i18n.T("drive_dl_move_fail"), file.Name, err)
+							logger.LogToFile("ERROR: Failed to download %s: %v", file.Name, err)
+							failed = true
+							globalHasErrors = true
+							continue // Skip processing this file
+						}
+					} else {
+						logger.LogToFile("DOWNLOAD: Successfully downloaded %s", file.Name)
 					}
-					logger.LogToFile("DOWNLOAD: Successfully downloaded %s", file.Name)
 
 					// Process immediately
 					localPath := filepath.Join(batchWorkDir, file.Name)
@@ -180,8 +191,9 @@ var driveDownloadCmd = &cobra.Command{
 				}
 
 				if failed {
-					logger.Error(i18n.T("drive_batch_failures"), ts)
-					continue
+					logger.Warn("⚠️  Batch %s had failures. Proceeding to finalize partial batch.", ts)
+					// We no longer `continue` here. By proceeding, we process the Signal file if possible,
+					// and Finalize whatever successfully downloaded to BackupPath so it's not wasted.
 				}
 
 				// 3. Process Signal File (Last)
@@ -191,15 +203,23 @@ var driveDownloadCmd = &cobra.Command{
 				// It might be the ONLY file (if len=1, loop above was skipped)
 				// Download Signal
 				if err := rc.MoveFile(signalFile.Name, batchWorkDir); err != nil {
-					logger.Error(i18n.T("drive_dl_move_fail"), signalFile.Name, err)
-					continue
+					localPath := filepath.Join(batchWorkDir, signalFile.Name)
+					if _, statErr := os.Stat(localPath); statErr == nil {
+						logger.Warn("⚠️  rc.MoveFile failed on signal file, but it downloaded. Proceeding...")
+						globalHasErrors = true
+					} else {
+						logger.Error(i18n.T("drive_dl_move_fail"), signalFile.Name, err)
+						globalHasErrors = true
+					}
 				}
 
 				// Process Signal
 				localPath := filepath.Join(batchWorkDir, signalFile.Name)
-				if err := batchEng.ProcessZipWithIndex(localPath, batchWorkDir); err != nil {
-					logger.Error(i18n.T("drive_process_fail"), signalFile.Name, err)
-					continue
+				if _, err := os.Stat(localPath); err == nil {
+					if err := batchEng.ProcessZipWithIndex(localPath, batchWorkDir); err != nil {
+						logger.Error(i18n.T("drive_process_fail"), signalFile.Name, err)
+						globalHasErrors = true
+					}
 				}
 
 				// Parse timestamp and format it for the Snapshot
@@ -247,6 +267,12 @@ var driveDownloadCmd = &cobra.Command{
 			checkStaleAndAlert()
 		} else {
 			logger.LogToFile("SUMMARY: Run completed. Downloaded & Processed: %d batches", processedBatches)
+		}
+
+		if globalHasErrors {
+			logger.LogToFile("FATAL: Execution completed with partial errors. Exiting with status 1.")
+			logger.CloseLogFile()
+			os.Exit(1)
 		}
 	},
 }
