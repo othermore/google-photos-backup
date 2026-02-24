@@ -130,6 +130,7 @@ If you have manually downloaded Takeout ZIPs, you can import them directly:
 The tool organizes files into a `Backup/YYYY/MM` structure.
 *   **Snapshots**: Each run can update the existing structure or create snapshots (configurable).
 *   **Hardlinks**: Identical files across backups (or imported multiple times) are hardlinked, using no additional space.
+*   **Directory Splitting**: To prevent severe I/O timeouts on Network Attached Storage (NAS) devices, the central `immich-master` repository enforces a strict limit of 500 files per folder. If a month exceeds this limit, files are safely overflowed into subdirectories (e.g., `YYYY/MM/Part_1`, `YYYY/MM/Part_2`).
 
 ## Advanced Configuration (`config.yaml`)
 

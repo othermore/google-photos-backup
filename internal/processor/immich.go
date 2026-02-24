@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"strings"
@@ -157,18 +158,48 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 	return newIndex, nil
 }
 
+type yearMonthState struct {
+	DirectCount int
+	PartCounts  map[int]int
+	MaxPart     int
+}
+
 // LinkSnapshotToMaster integrates a snapshot into the master directory.
 // masterHashMap: Map[Hash] -> RelPath (in master)
 func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, masterRoot string, masterIndex *registry.Index, masterHashMap map[string]string) error {
 
+	// 0. Pre-calculate directory states to manage the 500-file part limits
+	ymStates := make(map[string]*yearMonthState)
+
+	for _, entry := range masterIndex.Files {
+		dir := filepath.ToSlash(filepath.Dir(entry.RelPath))
+		parts := strings.Split(dir, "/")
+
+		if len(parts) == 2 {
+			ym := dir // "YYYY/MM"
+			if ymStates[ym] == nil {
+				ymStates[ym] = &yearMonthState{PartCounts: make(map[int]int)}
+			}
+			ymStates[ym].DirectCount++
+		} else if len(parts) == 3 && strings.HasPrefix(parts[2], "Part_") {
+			ym := parts[0] + "/" + parts[1]
+			if ymStates[ym] == nil {
+				ymStates[ym] = &yearMonthState{PartCounts: make(map[int]int)}
+			}
+			partNum, _ := strconv.Atoi(strings.TrimPrefix(parts[2], "Part_"))
+			ymStates[ym].PartCounts[partNum]++
+			if partNum > ymStates[ym].MaxPart {
+				ymStates[ym].MaxPart = partNum
+			}
+		}
+	}
+
 	for relPath, entry := range snapshotIndex.Files {
 		// 1. Check Deduplication
 		if _, exists := masterHashMap[entry.Hash]; exists {
-			// Already in Master
-			continue
+			continue // Already in Master
 		}
 
-		// Check ignored extensions
 		if IsIgnoredFile(relPath) {
 			continue
 		}
@@ -176,61 +207,114 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 		// 2. Not in Master: Link it
 		srcPath := filepath.Join(snapshotPath, relPath)
 
-		// Destination: YYYY/MM/Filename
 		year := entry.ModTime.Format("2006")
 		month := entry.ModTime.Format("01")
-		filename := filepath.Base(relPath)
+		ym := year + "/" + month
 
-		destDir := filepath.Join(masterRoot, year, month)
+		state := ymStates[ym]
+		if state == nil {
+			state = &yearMonthState{PartCounts: make(map[int]int)}
+			ymStates[ym] = state
+		}
+
+		// SPLIT LOGIC: If YYYY/MM has >= 500 files directly, move them to Part_1
+		if state.MaxPart == 0 && state.DirectCount >= 500 {
+			part1RelDir := filepath.Join(year, month, "Part_1")
+			part1AbsDir := filepath.Join(masterRoot, part1RelDir)
+			os.MkdirAll(part1AbsDir, 0755)
+
+			var toMove []registry.FileIndexEntry
+			for mRelPath, mEntry := range masterIndex.Files {
+				if filepath.ToSlash(filepath.Dir(mRelPath)) == ym {
+					toMove = append(toMove, mEntry)
+				}
+			}
+
+			logger.Info("🗂️  Splitting %s into Part_1 (%d files)...", ym, len(toMove))
+
+			for _, mEntry := range toMove {
+				oldAbs := filepath.Join(masterRoot, mEntry.RelPath)
+				filename := filepath.Base(mEntry.RelPath)
+				newRel := filepath.Join(part1RelDir, filename)
+				newAbs := filepath.Join(masterRoot, newRel)
+
+				if err := os.Rename(oldAbs, newAbs); err == nil {
+					delete(masterIndex.Files, mEntry.RelPath)
+					mEntry.RelPath = filepath.ToSlash(newRel)
+					masterIndex.Files[mEntry.RelPath] = mEntry
+					masterHashMap[mEntry.Hash] = mEntry.RelPath
+				}
+			}
+
+			state.MaxPart = 1
+			state.PartCounts[1] = state.DirectCount
+			state.DirectCount = 0
+		}
+
+		// SPLIT LOGIC: If the current MaxPart has >= 500 files, create next Part
+		if state.MaxPart > 0 && state.PartCounts[state.MaxPart] >= 500 {
+			state.MaxPart++
+			logger.Info("🗂️  %s reached 500 files, overflowing to Part_%d...", ym, state.MaxPart)
+		}
+
+		var destRelDir string
+		if state.MaxPart > 0 {
+			destRelDir = filepath.Join(year, month, fmt.Sprintf("Part_%d", state.MaxPart))
+			state.PartCounts[state.MaxPart]++
+		} else {
+			destRelDir = filepath.Join(year, month)
+			state.DirectCount++
+		}
+
+		filename := filepath.Base(relPath)
+		destDir := filepath.Join(masterRoot, destRelDir)
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return err
 		}
 
-		destRelPath := filepath.Join(year, month, filename)
+		destRelPath := filepath.Join(destRelDir, filename)
 		destFullPath := filepath.Join(masterRoot, destRelPath)
 
-		// Collision Handling (Same filename, different hash)
-		// Since we checked Hash above, we know this is NEW content.
-		// If file exists, it's a collision.
+		// Collision Handling & Linking
+		// Optimistically attempt to link. If it fails due to existence, rename and retry.
+		// This saves hundreds of thousands of os.Stat calls over the network.
 		counter := 1
 		ext := filepath.Ext(filename)
 		name := filename[:len(filename)-len(ext)]
+		linkSuccess := false
 
 		for {
-			if _, err := os.Stat(destFullPath); os.IsNotExist(err) {
+			err := os.Link(srcPath, destFullPath)
+			if err == nil {
+				linkSuccess = true
 				break
 			}
-			// Collision! Rename.
-			newFilename := fmt.Sprintf("%s_%d%s", name, counter, ext)
-			destRelPath = filepath.Join(year, month, newFilename)
-			destFullPath = filepath.Join(masterRoot, destRelPath)
-			counter++
+			if os.IsExist(err) {
+				// Collision! Rename.
+				newFilename := fmt.Sprintf("%s_%d%s", name, counter, ext)
+				destRelPath = filepath.Join(destRelDir, newFilename)
+				destFullPath = filepath.Join(masterRoot, destRelPath)
+				counter++
+			} else {
+				logger.Error("Failed to link to master %s: %v", destRelPath, err)
+				break
+			}
 		}
 
-		// Create Hardlink
-		if err := os.Link(srcPath, destFullPath); err != nil {
-			logger.Error("Failed to link to master %s: %v", destRelPath, err)
+		if !linkSuccess {
 			continue
 		}
 
-		// Update Master Index & Hash Map
-		// Get Inode of the new link
-		var inode uint64
-		if info, err := os.Stat(destFullPath); err == nil {
-			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				inode = stat.Ino
-			}
-		}
-
+		// The Inode of a hardlink is IDENTICAL to the source. No need to os.Stat the NAS!
 		newEntry := registry.FileIndexEntry{
-			RelPath: destRelPath,
+			RelPath: filepath.ToSlash(destRelPath),
 			Hash:    entry.Hash,
 			Size:    entry.Size,
 			ModTime: entry.ModTime,
-			Inode:   inode,
+			Inode:   entry.Inode, // Reuse known Inode instantly
 		}
 		masterIndex.AddOrUpdate(newEntry)
-		masterHashMap[entry.Hash] = destRelPath
+		masterHashMap[entry.Hash] = newEntry.RelPath
 	}
 	return nil
 }

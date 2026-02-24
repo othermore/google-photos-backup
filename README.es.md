@@ -127,6 +127,7 @@ Si has descargado manualmente ZIPs de Takeout, puedes importarlos directamente:
 La herramienta organiza los archivos en una estructura `Backup/AAAA/MM`.
 *   **Snapshots**: Cada ejecución puede actualizar la estructura existente o crear snapshots (configurable).
 *   **Hardlinks**: Los archivos idénticos entre copias (o importados múltiples veces) se enlazan mediante hardlinks, sin usar espacio adicional.
+*   **Límites de Directorio**: Para prevenir cuelgues del sistema de archivos al usar dispositivos NAS en red, el repositorio central `immich-master` limita cada carpeta a 500 archivos. Si un mes sobrepasa esta cifra, los archivos se distribuyen automáticamente en subdirectorios seguros (ej. `AAAA/MM/Part_1`, `AAAA/MM/Part_2`).
 
 ## Configuración Avanzada (`config.yaml`)
 
