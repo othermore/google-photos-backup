@@ -21,6 +21,18 @@ var rebuildIndexCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Info("🏗️  Starting Index Rebuild...")
 
+		targetDir, _ := cmd.Flags().GetString("target-dir")
+
+		if targetDir != "" {
+			logger.Info("📂 Rebuilding index exclusively for: %s", targetDir)
+			if _, err := processor.EnsureSnapshotIndex(targetDir, nil); err != nil {
+				logger.Error("❌ Failed to index %s: %v", targetDir, err)
+			} else {
+				logger.Info("✅ Index Rebuild Complete for %s.", targetDir)
+			}
+			return
+		}
+
 		backupPath := config.AppConfig.BackupPath
 		if backupPath == "" {
 			backupPath = viper.GetString("backup_path")
@@ -72,4 +84,5 @@ var rebuildIndexCmd = &cobra.Command{
 
 func init() {
 	toolCmd.AddCommand(rebuildIndexCmd)
+	rebuildIndexCmd.Flags().String("target-dir", "", "Target directory to rebuild (if empty, processes all snapshots in the Backup path)")
 }
