@@ -118,6 +118,18 @@ The `tool` command regroups all configuration and maintenance tasks:
 * `gpb tool fix-hardlinks`: Validates and repairs cross-volume hardlinks.
 * `gpb tool rebuild-immich-master`: Synchronizes snapshot with an `immich-master` read-only repository.
 
+**Correct Execution Order for Rebuilding**
+If you ever need to rebuild your entire database or fix massive date corruption issues inside the `immich-master` library, it is vital to execute the tools in this exact sequential order to prevent dragging errors:
+1. `fix-metadata` to physically repair the files first.
+2. `rebuild-index` to capture the healthy dates inside the indexes.
+3. `fix-hardlinks` to tie duplicates together based on the proper indexes.
+4. `rebuild-immich-master` to move the correct and deduplicated structure over to Immich.
+
+*Chained command example:*
+```bash
+./gpb tool fix-metadata ; ./gpb tool rebuild-index ; ./gpb tool fix-hardlinks ; ./gpb tool rebuild-immich-master
+```
+
 ### 4. Manual Import
 If you have manually downloaded Takeout ZIPs, you can import them directly:
 

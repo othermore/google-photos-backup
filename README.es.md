@@ -4,6 +4,10 @@
 > **👋 ¿Estás usando `gpb` o te ha parecido interesante?**
 > ¡Nos encantaría saber de ti! Por favor, considera [dejarnos un mensaje en los Issues](https://github.com/othermore/google-photos-backup/issues) para decírnoslo o compartir tu opinión. ¡Tu apoyo es lo que nos motiva a seguir! Echa un vistazo a [CONTRIBUTING.md](CONTRIBUTING.md) para ver cómo puedes ayudar u opinar (en inglés).
 
+# Herramienta de Backup Híbrido para Google Photos (gpb) v0.9.0
+
+Una herramienta por línea de comandos escrita en Go que automatiza las copias de seguridad de Google Photos mediante Takeout. Descarga y extrae archivos de forma incremental en una estructura de carpetas por año/mes (`Backup/AAAA/MM`), mientras elimina automáticamente el **100% de los duplicados**, tanto dentro del lote actual como en todo el archivo histórico, utilizando "hardlinks" que ocupan un tamaño de cero bytes.
+
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
@@ -67,13 +71,6 @@ Esto configurará tu:
 *   Remoto de Rclone (para modo Drive)
 *   Email para alertas
 
-## Herramienta de Backup Híbrido para Google Photos (gpb) v0.9.0
-
-Una herramienta por línea de comandos escrita en Go que automatiza las copias de seguridad de Google Photos mediante Takeout. Descarga y extrae archivos de forma incremental en una estructura de carpetas por año/mes (`Backup/AAAA/MM`), mientras elimina automáticamente el **100% de los duplicados**, tanto dentro del lote actual como en todo el archivo histórico, utilizando "hardlinks" que ocupan un tamaño de cero bytes.
-
-> **👋 ¿Estás usando `gpb` o te ha parecido interesante?**
-> ¡Nos encantaría saber de ti! Por favor, considera [dejarnos un mensaje en los Issues](https://github.com/othermore/google-photos-backup/issues) para decírnoslo o compartir tu opinión. ¡Tu apoyo es lo que nos motiva! Echa un vistazo a [CONTRIBUTING.md](CONTRIBUTING.md) para ver cómo puedes ayudar (en inglés).
-
 ## Uso
 
 ### 1. Backup Automatizado de Drive (Recomendado)
@@ -115,6 +112,18 @@ El comando `tool` agrupa todas las tareas de configuración y mantenimiento:
 * `gpb tool rebuild-index`: Reconstruye los índices locales.
 * `gpb tool fix-hardlinks`: Valida y repara los enlaces duros entre volúmenes.
 * `gpb tool rebuild-immich-master`: Sincroniza un snapshot con un repositorio de solo lectura `immich-master`.
+
+**Orden Correcto de Ejecución para Reconstrucción**
+Si en algún momento necesitas reconstruir toda tu base de datos o arreglar problemas masivos de fechas en la librería `immich-master`, es vital ejecutar las herramientas en este orden aritmético exacto para no arrastrar errores:
+1. `fix-metadata` para reparar físicamente los archivos.
+2. `rebuild-index` para capturar en los índices las fechas buenas.
+3. `fix-hardlinks` para conectar duplicados basándose en los índices.
+4. `rebuild-immich-master` para mover lo correcto y deduplicado al formato de Immich.
+
+*Ejemplo en cadena:*
+```bash
+./gpb tool fix-metadata ; ./gpb tool rebuild-index ; ./gpb tool fix-hardlinks ; ./gpb tool rebuild-immich-master
+```
 
 ### 4. Importación Manual
 Si has descargado manualmente ZIPs de Takeout, puedes importarlos directamente:
