@@ -12,6 +12,7 @@ import (
 
 	"strings"
 
+	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/registry"
@@ -56,6 +57,12 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 
 	err = filepath.Walk(snapshotPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			return nil
+		}
+		if config.IsIgnored(path) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if info.IsDir() {
@@ -201,7 +208,8 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 			continue // Already in Master
 		}
 
-		if IsIgnoredFile(relPath) {
+		// Limit master linking exclusively to valid media types (no json, no garbage)
+		if !config.IsValidMedia(relPath) || config.IsIgnored(relPath) || IsIgnoredFile(relPath) {
 			continue
 		}
 
@@ -218,9 +226,9 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 			ymStates[ym] = state
 		}
 
-		// SPLIT LOGIC: If YYYY/MM has >= 500 files directly, move them to Part_1
+		// SPLIT LOGIC: If YYYY/MM has >= 500 files directly, move them to Part_001
 		if state.MaxPart == 0 && state.DirectCount >= 500 {
-			part1RelDir := filepath.Join(year, month, "Part_1")
+			part1RelDir := filepath.Join(year, month, "Part_001")
 			part1AbsDir := filepath.Join(masterRoot, part1RelDir)
 			os.MkdirAll(part1AbsDir, 0755)
 
@@ -260,7 +268,7 @@ func LinkSnapshotToMaster(snapshotPath string, snapshotIndex *registry.Index, ma
 
 		var destRelDir string
 		if state.MaxPart > 0 {
-			destRelDir = filepath.Join(year, month, fmt.Sprintf("Part_%d", state.MaxPart))
+			destRelDir = filepath.Join(year, month, fmt.Sprintf("Part_%03d", state.MaxPart))
 			state.PartCounts[state.MaxPart]++
 		} else {
 			destRelDir = filepath.Join(year, month)

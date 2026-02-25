@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/logger"
 	"google-photos-backup/internal/registry"
 )
@@ -241,6 +242,9 @@ func (m *Manager) extractZip(src, dest string) (err error) {
 	}()
 
 	for _, f := range r.File {
+		if config.IsIgnored(f.Name) || (!config.IsValidMedia(f.Name) && !strings.HasSuffix(strings.ToLower(f.Name), ".json")) {
+			continue
+		}
 		if errExt := m.extractFile(f.Name, f, dest); errExt != nil {
 			// Log but continue, don't fail the entire archive for one file
 			logger.Error("⚠️  Failed to extract file %s from zip: %v", f.Name, errExt)
@@ -282,6 +286,9 @@ func (m *Manager) extractTgz(src, dest string) (err error) {
 		}
 
 		if header.Typeflag == tar.TypeReg {
+			if config.IsIgnored(header.Name) || (!config.IsValidMedia(header.Name) && !strings.HasSuffix(strings.ToLower(header.Name), ".json")) {
+				continue
+			}
 			if err := m.extractReader(header.Name, tr, dest, header.FileInfo().Mode()); err != nil {
 				logger.Error("⚠️  Failed to extract file %s from tgz: %v", header.Name, err)
 			}

@@ -69,15 +69,26 @@ var fixMetadataCmd = &cobra.Command{
 
 			// Walk to populate FileIndex purely based on extensions
 			err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-				if err != nil || info.IsDir() {
+				if err != nil {
+					return nil
+				}
+				if config.IsIgnored(path) {
+					if info.IsDir() {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				if info.IsDir() {
 					return nil
 				}
 				absPath, _ := filepath.Abs(path)
 				ext := strings.ToLower(filepath.Ext(path))
 				isJson := ext == ".json" || strings.HasSuffix(ext, ".json")
 
-				pm.FileIndex[absPath] = processor.FileMetadata{
-					IsJSON: isJson,
+				if isJson || config.IsValidMedia(path) {
+					pm.FileIndex[absPath] = processor.FileMetadata{
+						IsJSON: isJson,
+					}
 				}
 				return nil
 			})
