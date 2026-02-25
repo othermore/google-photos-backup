@@ -1,5 +1,8 @@
 > [!IMPORTANT]
-> **Pre-release v0.9.0**: The tool is stable and close to a 1.0.0 release, but please use it at your own risk. 
+> Utility in Beta state. Use it at your own risk.
+> * **v0.9.0 (Current)**: Tool is functionally mature, but limited testing has been performed.
+> * **v0.9.1 (Target: End of March)**: Will introduce a mechanism interacting with the Immich API to automatically recreate your Google Photos albums based on the downloaded directory structure. (Assumes images are added to Immich as an external library).
+> * **v1.0.0 (TBD)**: Final, stable release. Will be published once the tool has been battle-tested by multiple users over a few months. 
 > 
 > **👋 Are you using `gpb` or does it look interesting to you?**
 > We'd love to hear from you! Please consider [dropping a message in this issue](https://github.com/othermore/google-photos-backup/issues) to let us know, or to share your feedback. Your support keeps the project motivated! Check out [CONTRIBUTING.md](CONTRIBUTING.md) to see how you can help.
@@ -57,24 +60,16 @@ chmod +x gpb
 2. Ensure you have installed chromium or google chrome locally.
 3. If using `gpb drive`, authorize `rclone` and test with `rclone ls <your_remote>:Takeout`
 
-## Prerequisites
-*   **Google Chrome / Chromium**: For browser automation (scheduling/requesting).
-*   **Rclone**: Required for `drive` mode (downloading from Google Drive).
-*   **msmtp** (Optional): For email alerts.
+## ⚡ Getting Started: Quick setup (Recommended)
 
-## Configuration
+The most robust, automated, and recommended long-term setup is the **Drive Mode**. In this mode, Google exports photos to your Google Drive cloud account, and the tool silently picks them up in the background from your local server.
 
-Run the configuration wizard:
-
-```bash
-./gpb tool configure
-```
-
-This will set up your:
-*   Working Directory (temp space)
-*   Backup Directory (final storage)
-*   Rclone Remote (for Drive mode)
-*   Email for alerts
+Initial configuration from scratch:
+1. **Configure Rclone**: Install and authorize `rclone` with your Google account (see [Rclone (For Drive Mode)](#1-rclone-for-drive-mode) section).
+2. **Run the Wizard**: Launch `./gpb tool configure`. Follow the interactive instructions to define your storage paths and log into Google via the embedded browser to authorize the tool.
+3. **Schedule Execution**: Draft a job in your system's `cron` to execute `./gpb drive download` periodically (for example, every night). The tool will automatically and silently check for new Takeout exports to fetch out of Drive (see [Automated Drive Backup](#1-automated-drive-backup-recommended)).
+4. **Schedule Exports (Optional)**: Run `./gpb drive schedule` manually if you want the tool to instruct Google to automatically generate bi-monthly exports for you, or configure them yourself from the Google Takeout dashboard.
+5. **Emails (Optional)**: Install `msmtp` on your server and link it to the tool to receive email alerts whenever something fails or the automated Google Takeout exports expire (see [msmtp (For Email Alerts)](#2-msmtp-for-email-alerts) section).
 
 
 
@@ -234,6 +229,7 @@ To use `gpb drive`, you need `rclone` authorized with your Google account.
 *   Create a `New remote` (`n`). Name it exactly as your `rclone_remote` in `config.yaml` (default is `drive`).
 *   Select `Google Drive` (`drive`).
 *   Leave Custom client credentials blank (or provide your own API keys for higher limits).
+*   **Permissions**: When prompted for scope, you MUST select `1` (Full Access / Read and Write). Without write access, the tool will download your Takeouts but will fail to delete them from Google Drive afterwards, eventually causing you to run out of cloud storage space.
 *   Follow the browser prompt to grant Rclone access to your Drive.
 
 ### 2. msmtp (For Email Alerts)
