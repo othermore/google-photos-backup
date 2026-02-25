@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 )
 
@@ -85,7 +86,7 @@ func (m *Manager) Run() error {
 }
 
 func (m *Manager) ScanRaw(dir string, computeHash bool) error {
-	logger.Info("🔍 Scanning existing files in %s...", dir)
+	logger.Info(i18n.T("processor_scan_dir"), dir)
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) (walkErr error) {
 		if err != nil {
 			return err

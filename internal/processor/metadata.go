@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"google-photos-backup/internal/i18n"
 	"google-photos-backup/internal/logger"
 )
 
@@ -54,7 +55,7 @@ func (m *Manager) CorrectMetadata() error {
 		}
 	}
 
-	logger.Info("   Indexed %d JSON sidecars.", len(jsonFiles))
+	logger.Info(i18n.T("processor_indexed_json"), len(jsonFiles))
 
 	updated := 0
 	ambiguousMatches := make(map[string][]string) // json -> [images...]
@@ -107,17 +108,12 @@ func (m *Manager) CorrectMetadata() error {
 		// IF interactive -> show full summary, prompt, apply if user says yes
 
 		if fixMode == "yes" {
-			logger.Info("✅ Automatically applying %d ambiguous matches (fix-ambiguous-metadata=yes).", ambiguousCount)
+			logger.Info(i18n.T("processor_auto_ambig"), ambiguousCount)
 			shouldApply = true
 		} else {
 			// Show Full Summary (Interactive or No)
 
-			// Internationalized Messages
-			msgEn := fmt.Sprintf("\n⚠️  Found %d secure matches. For %d other files, a secure JSON could not be identified, but %d of them have a POSSIBLE match if we ignore filename length safety checks.", secureCount, len(m.FileIndex)-len(jsonFiles)-secureCount, ambiguousCount)
-			msgEs := fmt.Sprintf("\n⚠️  Se encontraron %d coincidencias seguras. Para otros %d archivos no se pudo identificar un JSON seguro, pero %d de ellos tienen una coincidencia POSIBLE si ignoramos las comprobaciones de seguridad de longitud de nombre.", secureCount, len(m.FileIndex)-len(jsonFiles)-secureCount, ambiguousCount)
-
-			fmt.Println(msgEn)
-			fmt.Println(msgEs)
+			fmt.Printf(i18n.T("processor_ambiguous_summary")+"\n", secureCount, len(m.FileIndex)-len(jsonFiles)-secureCount, ambiguousCount)
 			fmt.Println("---------------------------------------------------")
 
 			// Show examples (up to 15)
@@ -141,29 +137,29 @@ func (m *Manager) CorrectMetadata() error {
 				}
 			}
 			if ambiguousCount > 15 {
-				fmt.Printf("   ... and %d more / y %d más ...\n", ambiguousCount-15, ambiguousCount-15)
+				fmt.Printf(i18n.T("processor_ambiguous_more")+"\n", ambiguousCount-15)
 			}
 
 			if fixMode == "interactive" {
 				// Prompt user
-				fmt.Println("\n❓ Apply these insecure matches? / ¿Aplicar estas coincidencias inseguras? (y/n): ")
+				fmt.Print(i18n.T("processor_prompt_apply_insecure"))
 				var response string
 				fmt.Scanln(&response)
 
 				if strings.ToLower(response) == "y" || strings.ToLower(response) == "s" {
 					shouldApply = true
 				} else {
-					fmt.Println("Skipping insecure matches. / Saltando coincidencias inseguras.")
+					fmt.Println(i18n.T("processor_skipping_insecure"))
 				}
 			} else {
 				// Mode "no"
-				fmt.Println("\nSkipping insecure matches (fix-ambiguous-metadata=no). / Saltando coincidencias inseguras.")
+				fmt.Println(i18n.T("processor_skipping_insecure_no_mode"))
 			}
 		}
 
 		if shouldApply {
 			if fixMode == "interactive" {
-				fmt.Println("Applying insecure matches... / Aplicando coincidencias inseguras...")
+				fmt.Println(i18n.T("processor_applying_insecure"))
 			}
 			for jsonPath, images := range ambiguousMatches {
 				for _, img := range images {
@@ -175,7 +171,7 @@ func (m *Manager) CorrectMetadata() error {
 		}
 	}
 
-	logger.Info("✅ Metadata corrected for %d files.", updated)
+	logger.Info(i18n.T("processor_meta_corrected"), updated)
 	return nil
 }
 

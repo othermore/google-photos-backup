@@ -181,6 +181,46 @@ var messages = map[string]map[string]string{
 		"en": "Found previously extracted but unfinalized files. Resuming finalization phase...",
 		"es": "Se encontraron archivos previamente extraídos pero sin finalizar. Reanudando fase final...",
 	},
+	"processor_scan_dir": {
+		"en": "🔍 Scanning existing files in %s...",
+		"es": "🔍 Escaneando archivos existentes en %s...",
+	},
+	"processor_indexed_json": {
+		"en": "   Indexed %d JSON sidecars.",
+		"es": "   Indexados %d archivos JSON acompañantes.",
+	},
+	"processor_auto_ambig": {
+		"en": "✅ Automatically applying %d ambiguous matches (fix-ambiguous-metadata=yes).",
+		"es": "✅ Aplicando automáticamente %d coincidencias ambiguas (fix-ambiguous-metadata=yes).",
+	},
+	"processor_meta_corrected": {
+		"en": "✅ Metadata corrected for %d files.",
+		"es": "✅ Metadatos corregidos para %d archivos.",
+	},
+	"processor_ambiguous_summary": {
+		"en": "\n⚠️  Found %d secure matches. For %d other files, a secure JSON could not be identified, but %d of them have a POSSIBLE match if we ignore filename length safety checks.",
+		"es": "\n⚠️  Se encontraron %d coincidencias seguras. Para otros %d archivos no se pudo identificar un JSON seguro, pero %d de ellos tienen una coincidencia POSIBLE si ignoramos las comprobaciones de seguridad de longitud de nombre.",
+	},
+	"processor_ambiguous_more": {
+		"en": "   ... and %d more / y %d más ...",
+		"es": "   ... y %d más ...",
+	},
+	"processor_prompt_apply_insecure": {
+		"en": "\n❓ Apply these insecure matches? (y/n): ",
+		"es": "\n❓ ¿Aplicar estas coincidencias inseguras? (y/n): ",
+	},
+	"processor_skipping_insecure": {
+		"en": "Skipping insecure matches.",
+		"es": "Saltando coincidencias inseguras.",
+	},
+	"processor_skipping_insecure_no_mode": {
+		"en": "\nSkipping insecure matches (fix-ambiguous-metadata=no).",
+		"es": "\nSaltando coincidencias inseguras (fix-ambiguous-metadata=no).",
+	},
+	"processor_applying_insecure": {
+		"en": "Applying insecure matches...",
+		"es": "Aplicando coincidencias inseguras...",
+	},
 	"download_start": {
 		"en": "⬇️  Starting download for export %s...",
 		"es": "⬇️  Iniciando descarga de la exportación %s...",
