@@ -54,12 +54,22 @@ var importCmd = &cobra.Command{
 			}
 		}
 
-		if len(zips) == 0 {
+		extractedPath := filepath.Join(batchWorkDir, "extracted")
+		_, errExtracted := os.Stat(extractedPath)
+		hasOrphanedExtraction := errExtracted == nil
+
+		if len(zips) == 0 && !hasOrphanedExtraction {
 			logger.Warn(i18n.T("import_no_zips"), importDir)
 			return
 		}
 
-		logger.Info(i18n.T("import_found_count"), len(zips))
+		if hasOrphanedExtraction {
+			logger.Info("Found previously extracted but unfinalized files. Resuming finalization phase...")
+		}
+
+		if len(zips) > 0 {
+			logger.Info(i18n.T("import_found_count"), len(zips))
+		}
 
 		// 2. Process Zips Loop (Sequential)
 		for i, zipPath := range zips {
