@@ -1,5 +1,6 @@
 # Binarios
 gpb
+gpb-server
 
 # Configuración y Secretos (¡IMPORTANTE!)
 config.yaml
