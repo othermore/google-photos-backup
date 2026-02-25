@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var importCmd = &cobra.Command{
@@ -19,13 +18,6 @@ var importCmd = &cobra.Command{
 	Short: "Import and process manually downloaded zip files",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if logPath := viper.GetString("log"); logPath != "" {
-			if err := logger.InitLogFile(logPath); err == nil {
-				defer logger.CloseLogFile()
-				logger.LogToFile("==================================================")
-				logger.LogToFile("START: Command 'import' initiated")
-			}
-		}
 		importDir := args[0]
 
 		// Validate Source

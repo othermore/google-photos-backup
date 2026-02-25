@@ -185,13 +185,6 @@ var directDownloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Request a new Google Photos direct backup via Takeout",
 	Run: func(cmd *cobra.Command, args []string) {
-		if logPath := viper.GetString("log"); logPath != "" {
-			if err := logger.InitLogFile(logPath); err == nil {
-				defer logger.CloseLogFile()
-				logger.LogToFile("==================================================")
-				logger.LogToFile("START: Command 'direct download' initiated")
-			}
-		}
 		fmt.Println(i18n.T("sync_start"))
 
 		// Ensure the backup path is configured

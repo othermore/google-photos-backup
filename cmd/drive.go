@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var driveCmd = &cobra.Command{
@@ -31,13 +30,6 @@ var driveDownloadCmd = &cobra.Command{
 	Short: "Automated Drive Backup (Cron mode)",
 	Long:  `Checks Google Drive for new Takeout archives (batches). If found and ready, downloads and processes them. If not found and backup is stale, attempts auto-renewal or sends an alert.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if logPath := viper.GetString("log"); logPath != "" {
-			if err := logger.InitLogFile(logPath); err == nil {
-				defer logger.CloseLogFile()
-				logger.LogToFile("==================================================")
-				logger.LogToFile("START: Command 'drive download' initiated")
-			}
-		}
 		logger.Info(i18n.T("drive_robot_start"))
 
 		// 1. Config Check

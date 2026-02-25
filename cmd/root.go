@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"google-photos-backup/internal/config"
 	"google-photos-backup/internal/i18n" // <--- Importante
+	"google-photos-backup/internal/logger"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -18,8 +20,21 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		i18n.Init()                // <--- Detectar idioma PRIMERO
 		config.InitConfig(cfgFile) // Luego la config
+
+		if logPath := viper.GetString("log"); logPath != "" {
+			if err := logger.InitLogFile(logPath); err == nil {
+				logger.LogToFile("==================================================")
+				logger.LogToFile("START: %s", strings.Join(os.Args, " "))
+			}
+		}
 	},
-	// ... resto del código ...
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		if viper.GetString("log") != "" {
+			logger.LogToFile("END: %s", strings.Join(os.Args, " "))
+			logger.LogToFile("==================================================")
+			logger.CloseLogFile()
+		}
+	},
 }
 
 func init() {

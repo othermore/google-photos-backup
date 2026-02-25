@@ -11,7 +11,6 @@ import (
 	"google-photos-backup/internal/processor"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var fixMetadataCmd = &cobra.Command{
@@ -19,14 +18,6 @@ var fixMetadataCmd = &cobra.Command{
 	Short: "Retroactively apply JSON metadata fixes to snapshots",
 	Long:  `Scans the target directory or all snapshot directories in the main Backup location, matching media files with Google Takeout JSON sidecars to correct their filesystem modification dates. This strictly uses the same advanced heuristic engine as the import/drive process to find the correct JSON and only alters filesystem dates (not EXIF).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if logPath := viper.GetString("log"); logPath != "" {
-			if err := logger.InitLogFile(logPath); err == nil {
-				defer logger.CloseLogFile()
-				logger.LogToFile("==================================================")
-				logger.LogToFile("START: Command 'fix-metadata' initiated")
-			}
-		}
-
 		logger.Info(i18n.T("fix_metadata_start"))
 
 		targetDir, _ := cmd.Flags().GetString("target-dir")

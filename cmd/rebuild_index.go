@@ -19,14 +19,6 @@ var rebuildIndexCmd = &cobra.Command{
 	Short: "Rebuild index.json for all snapshots",
 	Long:  `Scans all timestamped snapshots in the backup directory and generates/updates their index.json file. It uses Inode optimization to speed up re-indexing.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if logPath := viper.GetString("log"); logPath != "" {
-			if err := logger.InitLogFile(logPath); err == nil {
-				defer logger.CloseLogFile()
-				logger.LogToFile("==================================================")
-				logger.LogToFile("START: Command 'rebuild-index' initiated")
-			}
-		}
-
 		logger.Info(i18n.T("rebuild_index_start"))
 
 		targetDir, _ := cmd.Flags().GetString("target-dir")
