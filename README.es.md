@@ -71,11 +71,7 @@ Esto configurará tu:
 *   Remoto de Rclone (para modo Drive)
 *   Email para alertas
 
-### Filtrado Avanzado de Archivos
-La aplicación filtra automáticamente el ruido (como carpetas de metadatos de un NAS) para que no consuman tiempo de reindexación ni acaben enlazados en tu servidor Immich.
-Si estas variables no están presentes en tu `config.yaml`, el Motor inyectará las listas seguras por defecto al final de tu archivo de configuración automáticamente en la siguiente ejecución:
-* `valid_media_extensions`: Una lista de extensiones de archivo permitidas (ej. `jpg`, `mp4`, `dng`, `heic`). Los archivos sin estas extensiones se descartarán durante la extracción o el escaneo, excepto los archivos `.json` que se mantienen estrictamente por propósitos de deduplicación/metadatos.
-* `ignored_files`: Una lista de nombres exactos o patrones *glob* para bloquear por completo la basura del sistema en todas las fases de escaneo de la herramienta (ej. `SYNOINDEX_MEDIA_INFO`, `@eaDir`, `*@synoeastream`).
+
 
 ## Uso
 
@@ -202,7 +198,8 @@ Este parámetro está soportado por los comandos `drive download`, `direct downl
 *   `immich_master_enabled`: (`true`/`false`) Activa la integración del repositorio de solo lectura para Immich.
 *   `immich_master_path`: Ruta donde se generará la carpeta `immich-master` (generalmente dentro de `backup_path`).
 *   `fix_ambiguous_metadata`: (`yes`, `no`, `interactive`) Cómo manejar fotos con fechas JSON faltantes/ambiguas.
-*   *Campos Heredados*: `client_id`, `client_secret` y `token_path` están obsoletos, ya que la autenticación ahora usa el navegador web directamente.
+*   `valid_media_extensions`: Una lista de extensiones de archivo permitidas (ej. `jpg`, `mp4`, `dng`, `heic`). Los archivos sin estas extensiones se descartarán durante la extracción o el escaneo, excepto los archivos `.json` que se mantienen estrictamente por propósitos de deduplicación/metadatos.
+*   `ignored_files`: Una lista de nombres exactos o patrones *glob* para bloquear por completo la basura del sistema en todas las fases de escaneo de la herramienta (ej. `SYNOINDEX_MEDIA_INFO`, `@eaDir`, `*@synoeastream`).
 
 ### Ejemplo de `config.yaml`
 ```yaml
@@ -213,6 +210,8 @@ email_alert_to: "alertas@midominio.com"
 immich_master_enabled: true
 immich_master_path: "/mnt/storage/photos/immich-master"
 fix_ambiguous_metadata: "yes"
+valid_media_extensions: ["jpg", "jpeg", "png", "gif", "mp4", "mov", "heic", "dng"]
+ignored_files: ["SYNOINDEX_MEDIA_INFO", "@eaDir", "*@synoeastream"]
 ```
 
 ### Detalles de Sesión y Autenticación

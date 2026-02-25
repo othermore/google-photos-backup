@@ -76,11 +76,7 @@ This will set up your:
 *   Rclone Remote (for Drive mode)
 *   Email for alerts
 
-### Advanced File Filtering
-The application automatically filters out noise (like NAS metadata folders) so they don't consume re-indexing time or end up linked to your Immich instance.
-If these variables are missing from your `config.yaml`, the Engine will inject the default safe lists at the bottom of your configuration file automatically on the next run:
-* `valid_media_extensions`: An array of allowed file extensions (e.g. `jpg`, `mp4`, `dng`, `heic`). Files without these extensions will be dropped during extraction or parsing, except `.json` files which are kept strictly for deduplication/metadata purposes.
-* `ignored_files`: An array of exact names or glob patterns to block system trash entirely across all scanning phases (e.g. `SYNOINDEX_MEDIA_INFO`, `@eaDir`, `*@synoeastream`).
+
 
 ## Usage
 
@@ -208,7 +204,8 @@ This flag is supported by the `drive download`, `direct download`, and `import` 
 *   `immich_master_enabled`: (`true`/`false`) Enables the Immich read-only repository integration.
 *   `immich_master_path`: The path where the `immich-master` folder will be kept (usually inside `backup_path`).
 *   `fix_ambiguous_metadata`: (`yes`, `no`, `interactive`) How to handle photos with missing/ambiguous JSON dates.
-*   *Legacy Fields*: `client_id`, `client_secret`, and `token_path` are deprecated since authentication uses the browser directly.
+*   `valid_media_extensions`: An array of allowed file extensions (e.g. `jpg`, `mp4`, `dng`, `heic`). Files without these extensions will be dropped during extraction or parsing, except `.json` files which are kept strictly for deduplication/metadata purposes.
+*   `ignored_files`: An array of exact names or glob patterns to block system trash entirely across all scanning phases (e.g. `SYNOINDEX_MEDIA_INFO`, `@eaDir`, `*@synoeastream`).
 
 ### Example `config.yaml`
 ```yaml
@@ -219,6 +216,8 @@ email_alert_to: "alerts@mydomain.com"
 immich_master_enabled: true
 immich_master_path: "/mnt/storage/photos/immich-master"
 fix_ambiguous_metadata: "yes"
+valid_media_extensions: ["jpg", "jpeg", "png", "gif", "mp4", "mov", "heic", "dng"]
+ignored_files: ["SYNOINDEX_MEDIA_INFO", "@eaDir", "*@synoeastream"]
 ```
 
 ### Authentication Session Details
