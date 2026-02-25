@@ -141,6 +141,46 @@ var messages = map[string]map[string]string{
 		"en": "   - Cancellation request sent.",
 		"es": "   - Solicitud de cancelación enviada.",
 	},
+	"engine_apply_metadata": {
+		"en": "📅 Applying metadata fixes from JSON sidecars...",
+		"es": "📅 Aplicando correcciones de metadatos desde los JSON...",
+	},
+	"engine_move_snapshot": {
+		"en": "📦 Moving processed files to snapshot: %s",
+		"es": "📦 Moviendo archivos procesados al snapshot: %s",
+	},
+	"engine_gen_snapshot_index": {
+		"en": "📝 Generating snapshot index...",
+		"es": "📝 Generando índice del snapshot...",
+	},
+	"engine_update_immich": {
+		"en": "📸 Updating Immich Master Directory (%s)...",
+		"es": "📸 Actualizando directorio maestro de Immich (%s)...",
+	},
+	"engine_err_move_snapshot": {
+		"en": "Failed to move files to snapshot: %v",
+		"es": "Error al mover archivos al snapshot: %v",
+	},
+	"engine_err_gen_index": {
+		"en": "Failed to generate snapshot index: %v",
+		"es": "Error al generar índice del snapshot: %v",
+	},
+	"engine_err_link_master": {
+		"en": "Failed to link new snapshot to master: %v",
+		"es": "Error al enlazar el nuevo snapshot al maestro: %v",
+	},
+	"engine_err_save_master": {
+		"en": "Failed to save Master Index: %v",
+		"es": "Error al guardar el índice maestro: %v",
+	},
+	"engine_move_summary": {
+		"en": "✅ Backup transfer complete: %d new files copied, %d cross-volume hardlinks created.",
+		"es": "✅ Transferencia al backup completada: %d archivos nuevos copiados, %d hardlinks cruzados creados.",
+	},
+	"import_resuming_orphans": {
+		"en": "Found previously extracted but unfinalized files. Resuming finalization phase...",
+		"es": "Se encontraron archivos previamente extraídos pero sin finalizar. Reanudando fase final...",
+	},
 	"download_start": {
 		"en": "⬇️  Starting download for export %s...",
 		"es": "⬇️  Iniciando descarga de la exportación %s...",

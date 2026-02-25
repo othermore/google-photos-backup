@@ -272,7 +272,7 @@ func (e *Engine) Finalize(snapshotName string) error {
 	}
 
 	// 1. Metadata Fix
-	logger.Info("📅 Applying metadata fixes from JSON sidecars...")
+	logger.Info(i18n.T("engine_apply_metadata"))
 	pm := processor.NewManager(extractDir, extractDir, e.AlbumsDir)
 	pm.FixAmbiguousMetadata = e.FixAmbiguousMetadata
 	if err := pm.ScanRaw(extractDir, false); err == nil {
@@ -281,7 +281,7 @@ func (e *Engine) Finalize(snapshotName string) error {
 
 	// 2. Move to Snapshot directory
 	snapshotDir := filepath.Join(e.BackupDir, snapshotName)
-	logger.Info("📦 Moving processed files to snapshot: %s", snapshotDir)
+	logger.Info(i18n.T("engine_move_snapshot"), snapshotDir)
 	if err := os.MkdirAll(snapshotDir, 0755); err != nil {
 		return err
 	}
@@ -289,6 +289,9 @@ func (e *Engine) Finalize(snapshotName string) error {
 	// Pre-load batch index for cross-volume deduplication fallback
 	batchIndexPath := filepath.Join(e.WorkingDir, "index.json")
 	batchIndex, _ := registry.LoadIndex(batchIndexPath)
+
+	filesMoved := 0
+	filesHardlinked := 0
 
 	err := filepath.Walk(extractDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || path == extractDir {
@@ -320,6 +323,7 @@ func (e *Engine) Finalize(snapshotName string) error {
 						if linkErr := os.Link(existingBackupPath, destPath); linkErr == nil {
 							os.Remove(path) // Remove from temp working dir
 							deduped = true
+							filesHardlinked++
 							logger.Debug("Linked known cross-volume duplicate: %s", relPath)
 						}
 					}
@@ -333,6 +337,7 @@ func (e *Engine) Finalize(snapshotName string) error {
 					if err := os.WriteFile(destPath, input, info.Mode()); err == nil {
 						os.Chtimes(destPath, info.ModTime(), info.ModTime())
 						os.Remove(path)
+						filesMoved++
 					}
 				}
 			}
@@ -340,15 +345,17 @@ func (e *Engine) Finalize(snapshotName string) error {
 		return nil
 	})
 	if err != nil {
-		logger.Error("Failed to move files to snapshot: %v", err)
+		logger.Error(i18n.T("engine_err_move_snapshot"), err)
+	} else {
+		logger.Info(i18n.T("engine_move_summary"), filesMoved, filesHardlinked)
 	}
 
 	// Generate and Save Snapshot Index
-	logger.Info("📝 Generating snapshot index...")
+	logger.Info(i18n.T("engine_gen_snapshot_index"))
 
 	snapIdx, err := processor.EnsureSnapshotIndex(snapshotDir, batchIndex)
 	if err != nil {
-		logger.Warn("Failed to generate snapshot index: %v", err)
+		logger.Warn(i18n.T("engine_err_gen_index"), err)
 	}
 
 	// 3. Immich Master Integration
@@ -359,7 +366,7 @@ func (e *Engine) Finalize(snapshotName string) error {
 			immichPath = "immich-master"
 		}
 		masterRoot := filepath.Join(e.BackupDir, immichPath)
-		logger.Info("📸 Updating Immich Master Directory (%s)...", immichPath)
+		logger.Info(i18n.T("engine_update_immich"), immichPath)
 
 		masterIndexPath := filepath.Join(masterRoot, "index.json")
 		masterIndex, err := registry.LoadIndex(masterIndexPath)
@@ -369,10 +376,10 @@ func (e *Engine) Finalize(snapshotName string) error {
 		masterHashMap := processor.GetMasterHashMap(masterIndex)
 
 		if err := processor.LinkSnapshotToMaster(snapshotDir, snapIdx, masterRoot, masterIndex, masterHashMap); err != nil {
-			logger.Error("Failed to link new snapshot to master: %v", err)
+			logger.Error(i18n.T("engine_err_link_master"), err)
 		} else {
 			if err := masterIndex.Save(masterIndexPath); err != nil {
-				logger.Error("Failed to save Master Index: %v", err)
+				logger.Error(i18n.T("engine_err_save_master"), err)
 			}
 		}
 	}

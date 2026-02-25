@@ -69,7 +69,7 @@ var importCmd = &cobra.Command{
 		}
 
 		if hasOrphanedExtraction {
-			logger.Info("Found previously extracted but unfinalized files. Resuming finalization phase...")
+			logger.Info(i18n.T("import_resuming_orphans"))
 		}
 
 		if len(zips) > 0 {
