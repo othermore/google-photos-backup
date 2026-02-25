@@ -286,6 +286,10 @@ func (e *Engine) Finalize(snapshotName string) error {
 		return err
 	}
 
+	// Pre-load batch index for cross-volume deduplication fallback
+	batchIndexPath := filepath.Join(e.WorkingDir, "index.json")
+	batchIndex, _ := registry.LoadIndex(batchIndexPath)
+
 	err := filepath.Walk(extractDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || path == extractDir {
 			return err
@@ -306,11 +310,30 @@ func (e *Engine) Finalize(snapshotName string) error {
 		// Move file
 		if err := os.Rename(path, destPath); err != nil {
 			// Cross-device fallback
-			input, err := os.ReadFile(path)
-			if err == nil {
-				if err := os.WriteFile(destPath, input, info.Mode()); err == nil {
-					os.Chtimes(destPath, info.ModTime(), info.ModTime())
-					os.Remove(path)
+			deduped := false
+
+			// 1. Try Cross-Volume Deduplication (Optimization)
+			if batchIndex != nil {
+				if entry, ok := batchIndex.Get(relPath); ok && entry.Hash != "" {
+					if existingBackupPath, found := e.GlobalIndex[entry.Hash]; found {
+						// The main-backup is on the destPath volume, so hardlink should work here
+						if linkErr := os.Link(existingBackupPath, destPath); linkErr == nil {
+							os.Remove(path) // Remove from temp working dir
+							deduped = true
+							logger.Debug("Linked known cross-volume duplicate: %s", relPath)
+						}
+					}
+				}
+			}
+
+			// 2. Fallback to physical byte-for-byte copy if dedup fails or file is unique
+			if !deduped {
+				input, err := os.ReadFile(path)
+				if err == nil {
+					if err := os.WriteFile(destPath, input, info.Mode()); err == nil {
+						os.Chtimes(destPath, info.ModTime(), info.ModTime())
+						os.Remove(path)
+					}
 				}
 			}
 		}
@@ -322,10 +345,6 @@ func (e *Engine) Finalize(snapshotName string) error {
 
 	// Generate and Save Snapshot Index
 	logger.Info("📝 Generating snapshot index...")
-
-	// Load batch index to use as cache (prevents rehashing!)
-	batchIndexPath := filepath.Join(e.WorkingDir, "index.json")
-	batchIndex, _ := registry.LoadIndex(batchIndexPath) // If error, nil is fine
 
 	snapIdx, err := processor.EnsureSnapshotIndex(snapshotDir, batchIndex)
 	if err != nil {
