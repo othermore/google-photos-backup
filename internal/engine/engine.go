@@ -47,36 +47,35 @@ func (e *Engine) LoadGlobalIndex() error {
 	logger.Info(i18n.T("drive_global_index_load"), e.BackupDir)
 	count := 0
 
-	// Walk BackupDir/YYYY/MM structure
-	err := filepath.Walk(e.BackupDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if info.Name() == "index.json" {
-			// Found an index file! Load it.
-			idx, err := registry.LoadIndex(path)
-			if err != nil {
-				logger.Warn(i18n.T("drive_global_index_fail"), path, err)
-				return nil
+	// Optimize: Only check immediate subdirectories of BackupDir for index.json.
+	// This prevents traversing 60,000+ files recursively over the network NAS.
+	entries, err := os.ReadDir(e.BackupDir)
+	if err == nil {
+		for _, entry := range entries {
+			// Skip hidden files or system dirs like @eaDir
+			if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") || entry.Name() == "@eaDir" {
+				continue
 			}
 
-			// Dir of this index (e.g. Backup/2015/10)
-			dir := filepath.Dir(path)
+			indexPath := filepath.Join(e.BackupDir, entry.Name(), "index.json")
+			if _, statErr := os.Stat(indexPath); statErr == nil {
+				// Found an index file! Load it.
+				idx, loadErr := registry.LoadIndex(indexPath)
+				if loadErr != nil {
+					logger.Warn(i18n.T("drive_global_index_fail"), indexPath, loadErr)
+					continue
+				}
 
-			for _, entry := range idx.Files {
-				// We map Hash -> Absolute Path
-				// entry.RelPath is relative to the index location?
-				// Usually index.json stores relative paths to the folder it's in.
-				absPath := filepath.Join(dir, entry.RelPath)
-				e.GlobalIndex[entry.Hash] = absPath
-				count++
+				dir := filepath.Dir(indexPath)
+				for _, fEntry := range idx.Files {
+					// Map Hash -> Absolute Path
+					absPath := filepath.Join(dir, fEntry.RelPath)
+					e.GlobalIndex[fEntry.Hash] = absPath
+					count++
+				}
 			}
 		}
-		return nil
-	})
+	}
 
 	logger.Info(i18n.T("drive_global_index_loaded"), count)
 	return err
