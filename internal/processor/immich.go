@@ -140,7 +140,7 @@ func EnsureSnapshotIndex(snapshotPath string, cacheIndex *registry.Index) (*regi
 			RelPath: relPath,
 			Hash:    hash,
 			Size:    info.Size(),
-			ModTime: info.ModTime(),
+			ModTime: info.ModTime(), // Always trust the physical disk timestamp (post-JSON fix)
 			Inode:   inode,
 		})
 

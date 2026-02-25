@@ -310,7 +310,10 @@ func (e *Engine) Finalize(snapshotName string) error {
 		}
 
 		// Move file
-		if err := os.Rename(path, destPath); err != nil {
+		errRename := os.Rename(path, destPath)
+		if errRename == nil {
+			filesMoved++
+		} else {
 			// Cross-device fallback
 			deduped := false
 
@@ -334,13 +337,18 @@ func (e *Engine) Finalize(snapshotName string) error {
 				input, err := os.ReadFile(path)
 				if err == nil {
 					if err := os.WriteFile(destPath, input, info.Mode()); err == nil {
-						os.Chtimes(destPath, info.ModTime(), info.ModTime())
 						os.Remove(path)
 						filesMoved++
 					}
 				}
 			}
 		}
+
+		// ALWAYS enforce the corrected JSON ModTime onto the final file
+		// If it's a hardlink, changing times on one link changes the inode times (affecting the original).
+		// Since both represent the same photo, having the corrected EXIF/JSON time is desired for both.
+		os.Chtimes(destPath, info.ModTime(), info.ModTime())
+
 		return nil
 	})
 	if err != nil {
