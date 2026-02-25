@@ -36,8 +36,9 @@ var importCmd = &cobra.Command{
 		logger.Info(i18n.T("import_start"), importDir)
 
 		// Initialize Engine
-		// Use working path for temp extraction
-		eng := engine.New(config.AppConfig.WorkingPath, config.AppConfig.BackupPath)
+		// Use scoped working path for temp extraction (very important for Finalize to find 'extracted' child)
+		batchWorkDir := filepath.Join(config.AppConfig.WorkingPath, "temp_import")
+		eng := engine.New(batchWorkDir, config.AppConfig.BackupPath)
 
 		// 1. Find Zips
 		files, err := os.ReadDir(importDir)
@@ -78,7 +79,7 @@ var importCmd = &cobra.Command{
 			// Check if we should move or copy
 			moveOriginal, _ := cmd.Flags().GetBool("move-original")
 
-			tempZip := filepath.Join(config.AppConfig.WorkingPath, "temp_import", filepath.Base(zipPath))
+			tempZip := filepath.Join(batchWorkDir, filepath.Base(zipPath))
 			os.MkdirAll(filepath.Dir(tempZip), 0755)
 
 			if moveOriginal {
