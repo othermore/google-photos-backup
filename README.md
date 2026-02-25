@@ -76,6 +76,12 @@ This will set up your:
 *   Rclone Remote (for Drive mode)
 *   Email for alerts
 
+### Advanced File Filtering
+The application automatically filters out noise (like NAS metadata folders) so they don't consume re-indexing time or end up linked to your Immich instance.
+If these variables are missing from your `config.yaml`, the Engine will inject the default safe lists at the bottom of your configuration file automatically on the next run:
+* `valid_media_extensions`: An array of allowed file extensions (e.g. `jpg`, `mp4`, `dng`, `heic`). Files without these extensions will be dropped during extraction or parsing, except `.json` files which are kept strictly for deduplication/metadata purposes.
+* `ignored_files`: An array of exact names or glob patterns to block system trash entirely across all scanning phases (e.g. `SYNOINDEX_MEDIA_INFO`, `@eaDir`, `*@synoeastream`).
+
 ## Usage
 
 ### 1. Automated Drive Backup (Recommended)

@@ -129,7 +129,7 @@ func appendDefaultsToConfig(configPath string, exts []string, ignores []string) 
 		if err == nil {
 			f.WriteString(builder.String())
 			f.Close()
-			logger.Info("✅ Valid extensions and ignored patterns automatically appended to config.yaml")
+			logger.Info(i18n.T("config_appended_defaults"))
 		}
 	}
 }

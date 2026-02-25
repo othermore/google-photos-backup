@@ -71,6 +71,12 @@ Esto configurará tu:
 *   Remoto de Rclone (para modo Drive)
 *   Email para alertas
 
+### Filtrado Avanzado de Archivos
+La aplicación filtra automáticamente el ruido (como carpetas de metadatos de un NAS) para que no consuman tiempo de reindexación ni acaben enlazados en tu servidor Immich.
+Si estas variables no están presentes en tu `config.yaml`, el Motor inyectará las listas seguras por defecto al final de tu archivo de configuración automáticamente en la siguiente ejecución:
+* `valid_media_extensions`: Una lista de extensiones de archivo permitidas (ej. `jpg`, `mp4`, `dng`, `heic`). Los archivos sin estas extensiones se descartarán durante la extracción o el escaneo, excepto los archivos `.json` que se mantienen estrictamente por propósitos de deduplicación/metadatos.
+* `ignored_files`: Una lista de nombres exactos o patrones *glob* para bloquear por completo la basura del sistema en todas las fases de escaneo de la herramienta (ej. `SYNOINDEX_MEDIA_INFO`, `@eaDir`, `*@synoeastream`).
+
 ## Uso
 
 ### 1. Backup Automatizado de Drive (Recomendado)

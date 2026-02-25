@@ -185,6 +185,10 @@ var messages = map[string]map[string]string{
 		"en": "Error decoding config: %s",
 		"es": "Error decodificando config: %s",
 	},
+	"config_appended_defaults": {
+		"en": "✅ Valid extensions and ignored patterns automatically appended to config.yaml",
+		"es": "✅ Extensiones validas y patrones ignorados añadidos automáticamente al config.yaml",
+	},
 	"invalid_mode": {
 		"en": "⚠️ Invalid mode, defaulting to %s",
 		"es": "⚠️ Modo inválido, usando por defecto %s",
