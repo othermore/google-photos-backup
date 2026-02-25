@@ -40,6 +40,11 @@ var importCmd = &cobra.Command{
 		batchWorkDir := filepath.Join(config.AppConfig.WorkingPath, "temp_import")
 		eng := engine.New(batchWorkDir, config.AppConfig.BackupPath)
 
+		// Load Global Index for Cross-Volume Deduplication
+		if err := eng.LoadGlobalIndex(); err != nil {
+			logger.Warn("Could not load global index: %v", err)
+		}
+
 		// 1. Find Zips
 		files, err := os.ReadDir(importDir)
 		if err != nil {
