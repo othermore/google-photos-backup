@@ -1,3 +1,6 @@
+[![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
+[![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
+
 > [!IMPORTANT]
 > Utility in Beta state. Use it at your own risk.
 > * **v0.9.0 (Current)**: Tool is functionally mature, but limited testing has been performed.
@@ -10,9 +13,6 @@
 # Google Photos Hybrid Backup Tool (gpb) v0.9.0
 
 A command-line tool written in Go that automates Google Photos Takeout backups, incrementally downloading and extracting files into a year/month folder structure structure (`Backup/YYYY/MM`), whilst automatically eliminating 100% of duplicates both within the current backup batch and across the entire historical backup archive using zero-space hardlinks.
-
-[![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
-[![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
 CLI tool to maintain local, incremental backups of your Google Photos library and make them accessible from **Immich**, with minimal user intervention.
 
