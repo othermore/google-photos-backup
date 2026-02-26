@@ -5,7 +5,7 @@
 > * **v1.0.0 (TBD)**: Final, stable release. Will be published once the tool has been battle-tested by multiple users over a few months. 
 > 
 > **👋 Are you using `gpb` or does it look interesting to you?**
-> We'd love to hear from you! Please consider [dropping a message in this issue](https://github.com/othermore/google-photos-backup/issues) to let us know, or to share your feedback. Your support keeps the project motivated! Check out [CONTRIBUTING.md](CONTRIBUTING.md) to see how you can help.
+> We'd love to hear from you! Please consider [dropping a message in this issue](https://github.com/othermore/google-photos-backup/issues/3) to let us know, or create new issues to share your feedback. Your support keeps the project motivated! Check out [CONTRIBUTING.md](CONTRIBUTING.md) to see how you can help.
 
 # Google Photos Hybrid Backup Tool (gpb) v0.9.0
 
