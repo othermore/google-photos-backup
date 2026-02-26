@@ -21,16 +21,16 @@ Diseñada para ejecutarse manualmente o vía Cron en servidores Linux (Debian, R
 
 ## Características
 
-    *   **Direct**: Configura exportaciones mediante "Enlace por correo", y la herramienta las descargará directamente comprobando Takeout periódicamente a través del navegador.
-    *   **Drive**: Configura y automatiza exportaciones recurrentes a Google Drive usando `rclone`.
-    *   **Import**: Procesa manualmente ZIPs de Takeout existentes.
-    *   **Tool**: Herramientas técnicas para configuración, indexación e integraciones con Immich.
-    *   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
-    *   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
-    *   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
-    *   **Integración con Immich**: Genera un repositorio de solo lectura `immich-master` para que tu backup pueda ser servido directamente por Immich sin duplicar datos.
-    *   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (ej. si Google deja de enviar exportaciones o requiere re-autenticación) vía sistema `msmtp`.
-    *   **Headless**: Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
+ *   **Direct**: Configura exportaciones mediante "Enlace por correo", y la herramienta las descargará directamente comprobando Takeout periódicamente a través del navegador.
+ *   **Drive**: Configura y automatiza exportaciones recurrentes a Google Drive usando `rclone`.
+ *   **Import**: Procesa manualmente ZIPs de Takeout existentes.
+ *   **Tool**: Herramientas técnicas para configuración, indexación e integraciones con Immich.
+ *   **Pipeline de Almacenamiento Optimizado**: Descarga, Descompresión, Corrección, Deduplicación y Limpieza ocurren en flujo continuo para minimizar el uso de disco.
+ *   **Calidad Original**: Asegura la descarga de archivos originales con metadatos completos (fechas JSON corregidas).
+ *   **Deduplicación Inteligente**: Usa enlaces duros (hardlinks) para deduplicación entre snapshots (Cero Espacio para duplicados).
+ *   **Integración con Immich**: Genera un repositorio de solo lectura `immich-master` para que tu backup pueda ser servido directamente por Immich sin duplicar datos.
+ *   **Alertas por Email**: Te notifica si las copias de seguridad se vuelven obsoletas (ej. si Google deja de enviar exportaciones o requiere re-autenticación) vía sistema `msmtp`.
+ *   **Headless**: Configurable vía archivos, perfecto para servidores sin interfaz gráfica (GUI).
 
 ## 🚀 Instalación y Compilación
 
