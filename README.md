@@ -3,8 +3,8 @@
 
 > [!IMPORTANT]
 > Utility in Beta state. Use it at your own risk.
-> * **v0.9.0 (Current)**: Tool is functionally mature, but limited testing has been performed.
-> * **v0.9.1 (Target: End of March)**: Will introduce a mechanism interacting with the Immich API to automatically recreate your Google Photos albums based on the downloaded directory structure. (Assumes images are added to Immich as an external library).
+> * **v0.9.1 (Current)**: Tool is functionally mature, but limited testing has been performed.
+> * **v0.9.X (Target: End of March)**: Will introduce a mechanism interacting with the Immich API to automatically recreate your Google Photos albums based on the downloaded directory structure. (Assumes images are added to Immich as an external library).
 > * **v1.0.0 (TBD)**: Final, stable release. Will be published once the tool has been battle-tested by multiple users over a few months. 
 > 
 > **👋 Are you using `gpb` or does it look interesting to you?**
