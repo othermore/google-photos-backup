@@ -1,3 +1,6 @@
+[![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
+[![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
+
 > [!IMPORTANT]
 > Utilidad en estado Beta. Úsala bajo tu propia responsabilidad.
 > * **v0.9.0 (Actual)**: La herramienta es funcionalmente madura, pero se han hecho pruebas limitadas.
@@ -10,9 +13,6 @@
 # Herramienta de Backup Híbrido para Google Photos (gpb) v0.9.0
 
 Una herramienta por línea de comandos escrita en Go que automatiza las copias de seguridad de Google Photos mediante Takeout. Descarga y extrae archivos de forma incremental en una estructura de carpetas por año/mes (`Backup/AAAA/MM`), mientras elimina automáticamente el **100% de los duplicados**, tanto dentro del lote actual como en todo el archivo histórico, utilizando "hardlinks" que ocupan un tamaño de cero bytes.
-
-[![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
-[![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
 Herramienta CLI para mantener copias de seguridad locales e incrementales de tu librería de Google Photos y hacerlas accesibles desde **Immich**, con una mínima intervención del usuario.
 
