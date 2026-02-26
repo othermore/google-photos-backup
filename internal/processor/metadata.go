@@ -29,8 +29,8 @@ type PhotoMetadata struct {
 
 var (
 	// Matches -edited, -edit, -edi, -ed, -e, - (at end of name, before ext)
-	// Also supports Spanish localized "-ha editado" and its truncated forms
-	reEdited = regexp.MustCompile(`[-_](e?d?i?t?e?d?|h?a?\s?e?d?i?t?a?d?o?)$`)
+	// Also supports Spanish localized "-ha editado", "-editada", and truncated forms
+	reEdited = regexp.MustCompile(`[-_](e?d?i?t?e?d?|h?a?\s?e?d?i?t?a?d?[oa]?)$`)
 
 	// Matches (1), (12)... at the end of the string
 	reNumbering = regexp.MustCompile(`\(\d+\)$`)
