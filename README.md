@@ -21,10 +21,10 @@ Designed to be run manually or via Cron on Linux servers (Debian, RedHat, etc.) 
 
 ## Features
 
-    *   **Direct**: Configure exports via "Email link", and the tool will download them directly by periodically polling Takeout via the browser.
-    *   **Drive**: Configure and automate recurring exports to Google Drive using `rclone`.
-    *   **Import**: Manually process existing Takeout ZIPs.
-    *   **Tool**: Technical tools for configuration, indexing, and Immich integrations.
+*   **Direct**: Configure exports via "Email link", and the tool will download them directly by periodically polling Takeout via the browser.
+*   **Drive**: Configure and automate recurring exports to Google Drive using `rclone`.
+*   **Import**: Manually process existing Takeout ZIPs.
+*   **Tool**: Technical tools for configuration, indexing, and Immich integrations.
 *   **Optimized Storage Pipeline**: Downloads, Unzips, Corrections, Deduplication, and Cleanup happen in a streaming pipeline to minimize disk usage.
 *   **Original Quality**: Ensures download of original files with full metadata (JSON dates fixed).
 *   **Smart Deduplication**: Uses hardlinks for cross-snapshot deduplication (Zero Space for duplicates).
