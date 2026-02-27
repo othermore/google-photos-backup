@@ -10,7 +10,7 @@
 > **👋 Are you using `gpb` or does it look interesting to you?**
 > We'd love to hear from you! Please consider [dropping a message in this issue](https://github.com/othermore/google-photos-backup/issues/3) to let us know, or create new issues to share your feedback. Your support keeps the project motivated! Check out [CONTRIBUTING.md](CONTRIBUTING.md) to see how you can help.
 
-# Google Photos Hybrid Backup Tool (gpb) v0.9.0
+# Google Photos Hybrid Backup Tool (gpb) v0.9
 
 A command-line tool written in Go that automates Google Photos Takeout backups, incrementally downloading and extracting files into a year/month folder structure structure (`Backup/YYYY/MM`), whilst automatically eliminating 100% of duplicates both within the current backup batch and across the entire historical backup archive using zero-space hardlinks.
 
