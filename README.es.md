@@ -1,6 +1,8 @@
 [![en](https://img.shields.io/badge/lang-en-red.svg)](README.md)
 [![es](https://img.shields.io/badge/lang-es-yellow.svg)](README.es.md)
 
+[![Donar con GitHub Sponsors](https://img.shields.io/badge/Donar-GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/othermore)
+
 > [!IMPORTANT]
 > Utilidad en estado Beta. Úsala bajo tu propia responsabilidad.
 > * **v0.9.1 (Actual)**: La herramienta es funcionalmente madura, pero se han hecho pruebas limitadas.
